@@ -21,6 +21,14 @@ all sections that have bonus related code are marked with
 
 #include "helper.hpp"
 
+Camera cam1 = { 0.0f, 1.0f, 5.0f, 0.0f, -1.0f, 0.0f }; // First Person
+Camera cam2 = { 0.0f, 1.0f, 5.0f, 0.0f, -1.0f, 0.0f }; // Rear View
+Camera cam3 = { 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f }; // Bird’s Eye
+
+Vector3 robotPositions[5];
+
+float cameraMS = 0.1f;
+
 bool dancing = false;  // toggled with 'd'
 int danceAngle = 0;    // current frame of animation
 float torsoBounce = 0.05f * sin(danceAngle * 3.14 / 180.0f);
@@ -34,10 +42,53 @@ float zoom = 1.0f;
 bool ortho = true;
 bool musicPlaying = false;
 
+bool rearCamOn = true;
+bool sceneCamOn = true;
+bool camSwitch = false;
+
 Vector3 torsoColor = getColor(BLUE);
 Vector3 headColor = getColor(YELLOW);
 Vector3 armColor = getColor(GREEN);
 Vector3 legColor = getColor(RED);
+
+void specialKeys(int key, int x, int y)
+{
+	switch (key) {
+	case GLUT_KEY_LEFT:
+		cam1.angle -= 0.05f;
+		cam1.lx = sin(cam1.angle);
+		cam1.lz = -cos(cam1.angle);
+		break;
+	case GLUT_KEY_RIGHT:
+		cam1.angle += 0.05f;
+		cam1.lx = sin(cam1.angle);
+		cam1.lz = -cos(cam1.angle);
+		break;
+	case GLUT_KEY_UP:
+		cam1.x += cam1.lx * cameraMS;
+		cam1.z += cam1.lz * cameraMS;
+		break;
+	case GLUT_KEY_DOWN:
+		cam1.x -= cam1.lx * cameraMS;
+		cam1.z -= cam1.lz * cameraMS;
+		break;
+
+	case GLUT_KEY_F1:
+		rearCamOn = !rearCamOn;     // toggle rear view
+		break;
+	case GLUT_KEY_F2:
+		sceneCamOn = !sceneCamOn;   // toggle bird’s-eye
+		break;
+	case GLUT_KEY_F3:
+		camSwitch = !camSwitch;     // toggle between FPV and ESV
+		break;
+	}
+
+	// Keep rear camera synced
+	cam2 = cam1;
+
+	glutPostRedisplay();
+}
 
 void keyboardInput(unsigned char input, int x, int y)
 {
@@ -254,36 +305,102 @@ void drawRobot()
 		BnW ? getColor(WHITE) : legColor);
 }
 
-void MyDisplay() {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glViewport(0, 0, 800, 600);
+void drawGroundPlane() {
+	glColor3f(0.3f, 0.7f, 0.3f);
+	glBegin(GL_QUADS);
+	glVertex3f(-20.0f, -1.0f, -20.0f);
+	glVertex3f(-20.0f, -1.0f, 20.0f);
+	glVertex3f(20.0f, -1.0f, 20.0f);
+	glVertex3f(20.0f, -1.0f, -20.0f);
+	glEnd();
+}
 
+void initRobots() {
+	srand(time(NULL));
+	for (int i = 0; i < 5; i++) {
+		robotPositions[i] = Vector3((rand() % 20) - 10, 0.0f, (rand() % 20) - 10);
+	}
+}
+
+void drawRobotAtRandom(int i) {
+	glPushMatrix();
+	glTranslatef(robotPositions[i].x, 0.0f, robotPositions[i].z);
+	drawRobot();
+	glPopMatrix();
+}
+
+void renderSceneFromCamera(Camera cam)
+{
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-
-	// enables switching between ortho and perspective
-	if (ortho)
-		glOrtho(-1.0 * zoom, 1.0 * zoom, -1.0 * zoom, 1.0 * zoom, -10.0, 10.0);
-	else
-		gluPerspective(60.0, 800.0 / 600.0, 0.1, 100.0);
+	gluPerspective(60.0, 800.0 / 600.0, 0.1, 100.0);
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	if (!ortho) glTranslatef(0, 0, -5.0); // move back in perspective mode
+	gluLookAt(cam.x, cam.y, cam.z,
+		cam.x + cam.lx, cam.y, cam.z + cam.lz,
+		0.0f, 1.0f, 0.0f);
 
-	// rotates camera around robot
-	glRotatef(globalRot.x, 1, 0, 0);
-	glRotatef(globalRot.y, 0, 1, 0);
-	glRotatef(globalRot.z, 0, 0, 1);
+	drawGroundPlane();
+	for (int i = 0; i < 5; i++) drawRobotAtRandom(i); // multiple robots
+	if (axies) drawAxies();
+}
 
-	// checks if should draw
-	if (!clear) {
-		drawRobot();
+void MyDisplay() {
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	// If the user toggled screen clearing (c key)
+	if (clear) {
+		glutSwapBuffers();
+		return;
+	}
+
+	// === MAIN VIEW ===
+	if (camSwitch) {
+		// F3 active  Bird’s-eye only
+		glViewport(0, 0, 800, 600);
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+		gluPerspective(60.0, 800.0 / 600.0, 0.1, 100.0);
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+		gluLookAt(0.0f, 20.0f, 0.01f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f);
+		drawGroundPlane();
+		for (int i = 0; i < 5; i++) drawRobotAtRandom(i);
+		if (axies) drawAxies();
+	}
+	else {
+		// Normal first-person view
+		glViewport(0, 0, 800, 600);
+		renderSceneFromCamera(cam1);
+	}
+
+	// === REAR VIEW (F1 toggle) ===
+	if (rearCamOn) {
+		glViewport(0, 450, 200, 150);
+		Camera rear = cam2;
+		rear.angle += 3.14159f;
+		rear.lx = sin(rear.angle);
+		rear.lz = -cos(rear.angle);
+		renderSceneFromCamera(rear);
+	}
+
+	// === BIRD’S-EYE (F2 toggle) ===
+	if (sceneCamOn) {
+		glViewport(600, 450, 200, 150);
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+		gluPerspective(60.0, 800.0 / 600.0, 0.1, 100.0);
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+		gluLookAt(0.0f, 20.0f, 0.01f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f);
+		drawGroundPlane();
+		for (int i = 0; i < 5; i++) drawRobotAtRandom(i);
 		if (axies) drawAxies();
 	}
 
-	glFlush();
+	glutSwapBuffers();
 }
 
 int main(int argc, char** argv) {
@@ -305,6 +422,7 @@ int main(int argc, char** argv) {
 	glutDisplayFunc(MyDisplay);
 	glutKeyboardFunc(keyboardInput);
 	glutMouseFunc(mouseInput);
+	glutSpecialFunc(specialKeys); // For camera movement
 
 	//
 	//////////// BONUS

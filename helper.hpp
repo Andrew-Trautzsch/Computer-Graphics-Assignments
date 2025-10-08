@@ -35,6 +35,12 @@ enum Color {
 	RED, GREEN, BLUE, YELLOW, CYAN, MAGENTA, WHITE
 };
 
+struct Camera {
+	float x, y, z; // Position
+	float lx, lz;  // Look direction, only need x and z
+	float angle;   // Rotation angle in 
+};
+
 extern bool dancing;
 extern int danceAngle;
 extern float torsoBounce;

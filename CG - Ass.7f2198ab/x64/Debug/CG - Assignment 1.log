@@ -1,12 +1,9 @@
-﻿  helper.cpp
-  main.cpp
-C:\Users\traut\source\repos\Computer-Graphics-Assignments\helper.cpp(112,41): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
-C:\Users\traut\source\repos\Computer-Graphics-Assignments\helper.cpp(113,41): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
-C:\Users\traut\source\repos\Computer-Graphics-Assignments\helper.cpp(114,41): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
-C:\Users\traut\source\repos\Computer-Graphics-Assignments\main.cpp(26,19): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-C:\Users\traut\source\repos\Computer-Graphics-Assignments\main.cpp(224,14): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-C:\Users\traut\source\repos\Computer-Graphics-Assignments\main.cpp(231,27): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-C:\Users\traut\source\repos\Computer-Graphics-Assignments\main.cpp(238,11): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-  Generating Code...
-  LINK : C:\Users\traut\source\repos\Computer-Graphics-Assignments\x64\Debug\CG - Assignment 1.exe not found or not built by the last incremental link; performing full link
+﻿  main.cpp
+C:\Users\traut\source\repos\Computer-Graphics-Assignments\main.cpp(34,19): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\traut\source\repos\Computer-Graphics-Assignments\main.cpp(275,14): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\traut\source\repos\Computer-Graphics-Assignments\main.cpp(282,27): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\traut\source\repos\Computer-Graphics-Assignments\main.cpp(289,11): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\traut\source\repos\Computer-Graphics-Assignments\main.cpp(319,12): warning C4244: 'argument': conversion from 'time_t' to 'unsigned int', possible loss of data
+C:\Users\traut\source\repos\Computer-Graphics-Assignments\main.cpp(321,71): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\traut\source\repos\Computer-Graphics-Assignments\main.cpp(321,45): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
   CG - Assignment 1.vcxproj -> C:\Users\traut\source\repos\Computer-Graphics-Assignments\x64\Debug\CG - Assignment 1.exe
