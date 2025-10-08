@@ -39,6 +39,7 @@ Vector3 robotPositions[5];
 float cameraMS = 0.1f;
 
 bool dancing = false;  // toggled with 'd'
+bool groupDance = true;
 int danceAngle = 0;    // current frame of animation
 float torsoBounce = 0.05f * sin(danceAngle * 3.14 / 180.0f);
 
@@ -128,6 +129,9 @@ void keyboardInput(unsigned char input, int x, int y)
 			// stop music when dancing stops
 			PlaySound(NULL, 0, 0);
 		}
+		break;
+	case 'i':  // toggle between group and individual dancing
+		groupDance = !groupDance;
 		break;
 	case 'm':
 		musicPlaying = !musicPlaying;
@@ -269,50 +273,112 @@ void createObject(Shape type, Vector3 position, Vector3 rotation, Vector3 scale,
 }
 
 // draws head, body, legs, and arms
-void drawRobot()
+// Draws one robot using a localAngle (degrees) and a dance type to vary animations
+void drawRobot(float localAngle, int type)
 {
-	// Torso (blue)
-	createObject(CUBE,						 // type
-		Vector3(0.0f, torsoBounce, 0.0f),    // posistion
-		Vector3(0, 0, 0),				     // rotation
-		Vector3(0.8f, 1.0f, 0.4f),			 // scale
-		BnW ? getColor(WHITE) : torsoColor); // color
+	// compute torso bounce using sine of localAngle (convert to radians)
+	float torsoBounceLocal = 0.05f * sinf(localAngle * PI / 180.0f);
 
-	// Head (yellow)
+	// We'll compute per-part transforms that vary by the 'type'
+	float headYrot = 0.0f;
+	float leftArmXrot = 0.0f;
+	float rightArmXrot = 0.0f;
+	float bodyYaw = 0.0f;
+	float lateralShift = 0.0f;
+	float leftLegXrot = 0.0f;
+	float rightLegXrot = 0.0f;
+
+	// common waving amount
+	float swing = (sinf(localAngle * PI / 180.0f) * 30.0f); // -30..30 deg
+	float kick = (sinf(localAngle * PI / 180.0f) * 40.0f); // -40..40 deg
+	float bob = (sinf(localAngle * PI / 180.0f) * 0.1f);  // -0.1..0.1 units
+
+	switch (type) {
+	case 0: // classic arm-swing dance (arms swing, head slight bob)
+		leftArmXrot = swing;
+		rightArmXrot = -swing;
+		headYrot = (sinf(localAngle * PI / 180.0f * 0.5f) * 10.0f); // gentle head turn
+		leftLegXrot = -swing * 0.5f;
+		rightLegXrot = swing * 0.5f;
+		break;
+	case 1: // head-bob + torso bounce
+		headYrot = (sinf(localAngle * PI / 180.0f * 2.0f) * 25.0f);
+		leftArmXrot = swing * 0.3f;
+		rightArmXrot = -swing * 0.3f;
+		break;
+	case 2: // leg-kick heavy
+		leftLegXrot = kick;
+		rightLegXrot = -kick;
+		leftArmXrot = kick * 0.25f;
+		rightArmXrot = -kick * 0.25f;
+		break;
+	case 3: // spin in place
+		bodyYaw = fmodf(localAngle * 2.0f, 360.0f); // faster spin
+		leftArmXrot = 20.0f * sinf(localAngle * PI / 180.0f);
+		rightArmXrot = -20.0f * sinf(localAngle * PI / 180.0f);
+		break;
+	case 4: // shuffle: small lateral shift + subtle arm movement
+		lateralShift = bob * 0.5f; // move left-right
+		leftArmXrot = swing * 0.4f;
+		rightArmXrot = -swing * 0.4f;
+		break;
+	default:
+		leftArmXrot = swing;
+		rightArmXrot = -swing;
+		break;
+	}
+
+	// Start drawing the robot using the computed transforms
+	glPushMatrix();
+
+	// Apply lateral shuffle
+	if (lateralShift != 0.0f) glTranslatef(lateralShift, 0.0f, 0.0f);
+
+	// Torso (blue) - include bounce
+	createObject(CUBE,
+		Vector3(0.0f, torsoBounceLocal, 0.0f),
+		Vector3(0.0f, bodyYaw, 0.0f),               // yaw the whole body if spinning
+		Vector3(0.8f, 1.0f, 0.4f),
+		BnW ? getColor(WHITE) : torsoColor);
+
+	// Head (yellow) - rotated around Y
 	createObject(CUBE,
 		Vector3(0.0f, 0.8f, 0.0f),
-		Vector3(0, danceAngle, 0),  // rotate on Y axis
+		Vector3(0.0f, headYrot, 0.0f),
 		Vector3(0.6f, 0.6f, 0.6f),
 		BnW ? getColor(WHITE) : headColor);
 
-	// Left Arm (green)
+	// Left Arm (green) - rotation about X axis
 	createObject(CUBE,
 		Vector3(-0.55f, 0.0f, 0.0f),
-		Vector3(danceAngle % 60 - 30, 0, 0), // oscillates between -30 and 30
+		Vector3(leftArmXrot, 0.0f, 0.0f),
 		Vector3(0.3f, 1.0f, 0.3f),
 		BnW ? getColor(WHITE) : armColor);
 
 	// Right Arm (green)
 	createObject(CUBE,
 		Vector3(0.55f, 0.0f, 0.0f),
-		Vector3(-(danceAngle % 60 - 30), 0, 0),
+		Vector3(rightArmXrot, 0.0f, 0.0f),
 		Vector3(0.3f, 1.0f, 0.3f),
 		BnW ? getColor(WHITE) : armColor);
 
 	// Left Leg (red)
 	createObject(CUBE,
 		Vector3(-0.2f, -1.0f, 0.0f),
-		Vector3(0, 0, 0),
+		Vector3(leftLegXrot, 0.0f, 0.0f),
 		Vector3(0.3f, 1.0f, 0.3f),
 		BnW ? getColor(WHITE) : legColor);
 
 	// Right Leg (red)
 	createObject(CUBE,
 		Vector3(0.2f, -1.0f, 0.0f),
-		Vector3(0, 0, 0),
+		Vector3(rightLegXrot, 0.0f, 0.0f),
 		Vector3(0.3f, 1.0f, 0.3f),
 		BnW ? getColor(WHITE) : legColor);
+
+	glPopMatrix();
 }
+
 
 void drawGroundPlane() {
 	glColor3f(0.3f, 0.3f, 0.3f);
@@ -346,9 +412,27 @@ void initRobots() {
 void drawRobotAtRandom(int i) {
 	glPushMatrix();
 	glTranslatef(robotPositions[i].x, 0.0f, robotPositions[i].z);
-	drawRobot();
+
+	float localAngle;
+	int danceType;
+
+	if (groupDance) {
+		// === GROUP DANCE MODE ===
+		// All robots share the same global danceAngle and danceType (e.g., type 0)
+		localAngle = danceAngle;
+		danceType = 0;  // You can change this to any dance style (0–4)
+	}
+	else {
+		// === INDIVIDUAL DANCE MODE ===
+		// Each robot dances independently using randomized parameters
+		localAngle = danceAngle * robotSpeeds[i] + robotOffsets[i];
+		danceType = robotTypes[i];
+	}
+
+	drawRobot(localAngle, danceType);
 	glPopMatrix();
 }
+
 
 void renderSceneFromCamera(Camera cam, int viewW, int viewH)
 {
