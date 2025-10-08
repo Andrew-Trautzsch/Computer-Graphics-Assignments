@@ -21,10 +21,19 @@ all sections that have bonus related code are marked with
 
 #include "helper.hpp"
 
+const int WIN_W = 800;
+const int WIN_H = 600;
+
 Camera cam1 = { 0.0f, 1.0f, 5.0f, 0.0f, -1.0f, 0.0f }; // First Person
 Camera cam2 = { 0.0f, 1.0f, 5.0f, 0.0f, -1.0f, 0.0f }; // Rear View
-Camera cam3 = { 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f }; // Bird’s Eye
+Camera cam3 = { 0.0f, 20.0f, 0.0f, 0.0f, 0.0f, 0.0f }; // Bird’s Eye
 
+#define PI 3.14159265f
+
+// Per-robot dance parameters (one entry per robot)
+float robotSpeeds[5];   // multiplier for how fast each robot animates (e.g. 0.8 - 1.4)
+float robotOffsets[5];  // phase offset in degrees (0 - 359)
+int   robotTypes[5];    // selects which distinct animation (0..4)
 Vector3 robotPositions[5];
 
 float cameraMS = 0.1f;
@@ -306,19 +315,31 @@ void drawRobot()
 }
 
 void drawGroundPlane() {
-	glColor3f(0.3f, 0.7f, 0.3f);
+	glColor3f(0.3f, 0.3f, 0.3f);
 	glBegin(GL_QUADS);
-	glVertex3f(-20.0f, -1.0f, -20.0f);
-	glVertex3f(-20.0f, -1.0f, 20.0f);
-	glVertex3f(20.0f, -1.0f, 20.0f);
-	glVertex3f(20.0f, -1.0f, -20.0f);
+	glVertex3f(-100.0f, -1.5f, -100.0f);
+	glVertex3f(-100.0f, -1.5f, 100.0f);
+	glVertex3f(100.0f, -1.5f, 100.0f);
+	glVertex3f(100.0f, -1.5f, -100.0f);
 	glEnd();
+
 }
 
 void initRobots() {
-	srand(time(NULL));
+	srand((unsigned int)time(NULL));
 	for (int i = 0; i < 5; i++) {
+		// random positions in [-10,10)
 		robotPositions[i] = Vector3((rand() % 20) - 10, 0.0f, (rand() % 20) - 10);
+
+		// Randomize dance parameters:
+		// Speed: 80% - 140% of base speed
+		robotSpeeds[i] = 0.8f + (rand() % 61) / 100.0f; // 0.8 .. 1.40
+
+		// Phase offset: 0 - 359 degrees
+		robotOffsets[i] = (float)(rand() % 360);
+
+		// Dance type: choose 0..4 (5 distinct animations)
+		robotTypes[i] = rand() % 5;
 	}
 }
 
@@ -329,79 +350,131 @@ void drawRobotAtRandom(int i) {
 	glPopMatrix();
 }
 
-void renderSceneFromCamera(Camera cam)
+void renderSceneFromCamera(Camera cam, int viewW, int viewH)
 {
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	gluPerspective(60.0, 800.0 / 600.0, 0.1, 100.0);
+	gluPerspective(60.0, (double)viewW / (double)viewH, 0.1, 100.0);
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	gluLookAt(cam.x, cam.y, cam.z,
-		cam.x + cam.lx, cam.y, cam.z + cam.lz,
-		0.0f, 1.0f, 0.0f);
+	// special case: bird’s-eye camera (looking straight down)
+	if (cam.y > 5.0f && cam.lx == 0.0f && cam.lz == 0.0f) {
+		gluLookAt(cam.x, cam.y, cam.z,    // eye
+			cam.x, 0.0f, cam.z,     // center (downward)
+			0.0f, 0.0f, -1.0f);     // up vector points toward -Z
+	}
+	else {
+		// regular forward-facing camera
+		gluLookAt(cam.x, cam.y, cam.z,
+			cam.x + cam.lx, cam.y, cam.z + cam.lz,
+			0.0f, 1.0f, 0.0f);
+	}
 
 	drawGroundPlane();
-	for (int i = 0; i < 5; i++) drawRobotAtRandom(i); // multiple robots
+	for (int i = 0; i < 5; i++) drawRobotAtRandom(i);
 	if (axies) drawAxies();
 }
 
+
+void clearViewportArea(int x, int y, int w, int h) {
+	// Clears only the rectangle defined by (x,y,w,h)
+	glEnable(GL_SCISSOR_TEST);
+	glScissor(x, y, w, h); // coordinates in pixels
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glDisable(GL_SCISSOR_TEST);
+}
+
 void MyDisplay() {
+	// Clear the whole window first (safe start)
+	glViewport(0, 0, WIN_W, WIN_H);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	// If the user toggled screen clearing (c key)
+	// If the user toggled screen clearing (c key) — keep the screen blank
 	if (clear) {
+		// We've already cleared; just present the black screen
 		glutSwapBuffers();
 		return;
 	}
 
-	// === MAIN VIEW ===
+	// === MAIN VIEW (either FPV or Bird's eye depending on camSwitch) ===
 	if (camSwitch) {
-		// F3 active  Bird’s-eye only
-		glViewport(0, 0, 800, 600);
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
-		gluPerspective(60.0, 800.0 / 600.0, 0.1, 100.0);
-		glMatrixMode(GL_MODELVIEW);
-		glLoadIdentity();
-		gluLookAt(0.0f, 20.0f, 0.01f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f);
-		drawGroundPlane();
-		for (int i = 0; i < 5; i++) drawRobotAtRandom(i);
-		if (axies) drawAxies();
+		// Bird’s-eye as the main (full window)
+		// Clear main viewport explicitly (redundant but safe)
+		clearViewportArea(0, 0, WIN_W, WIN_H);
+
+		glViewport(0, 0, WIN_W, WIN_H);
+		// reuse renderSceneFromCamera but with appropriate size
+		Camera bird = cam3; // or compute/lookat inline if you prefer
+		// manually set bird's look if desired or use current cam3
+		renderSceneFromCamera(bird, WIN_W, WIN_H);
+
+		// small camera windows (only if toggled on)
+		if (sceneCamOn) {
+			// small view in upper-left (quarter size)
+			int w = WIN_W / 4; // 200
+			int h = WIN_H / 4; // 150
+			int x = WIN_W - w;
+			int y = WIN_H - h;
+			clearViewportArea(x, y, w, h);
+			glViewport(x, y, w, h);
+			renderSceneFromCamera(cam1, w, h); // show FPV scaled down
+		}
+
+		if (rearCamOn) {
+			int w = WIN_W / 4;
+			int h = WIN_H / 4;
+			int x = 0;
+			int y = WIN_H - h;
+			// prepare the rear camera (rotate 180deg)
+			Camera rear = cam2;
+			rear.angle += 3.14159f;
+			rear.lx = sin(rear.angle);
+			rear.lz = -cos(rear.angle);
+			clearViewportArea(x, y, w, h);
+			glViewport(x, y, w, h);
+			renderSceneFromCamera(rear, w, h);
+		}
 	}
 	else {
-		// Normal first-person view
-		glViewport(0, 0, 800, 600);
-		renderSceneFromCamera(cam1);
-	}
+		// Normal first-person view as main
+		clearViewportArea(0, 0, WIN_W, WIN_H);
+		glViewport(0, 0, WIN_W, WIN_H);
+		renderSceneFromCamera(cam1, WIN_W, WIN_H);
 
-	// === REAR VIEW (F1 toggle) ===
-	if (rearCamOn) {
-		glViewport(0, 450, 200, 150);
-		Camera rear = cam2;
-		rear.angle += 3.14159f;
-		rear.lx = sin(rear.angle);
-		rear.lz = -cos(rear.angle);
-		renderSceneFromCamera(rear);
-	}
+		if (rearCamOn) {
+			int w = WIN_W / 4;
+			int h = WIN_H / 4;
+			int x = 0;
+			int y = WIN_H - h;
+			Camera rear = cam2;
+			rear.angle += 3.14159f;
+			rear.lx = sin(rear.angle);
+			rear.lz = -cos(rear.angle);
+			clearViewportArea(x, y, w, h);
+			glViewport(x, y, w, h);
+			renderSceneFromCamera(rear, w, h);
+		}
 
-	// === BIRD’S-EYE (F2 toggle) ===
-	if (sceneCamOn) {
-		glViewport(600, 450, 200, 150);
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
-		gluPerspective(60.0, 800.0 / 600.0, 0.1, 100.0);
-		glMatrixMode(GL_MODELVIEW);
-		glLoadIdentity();
-		gluLookAt(0.0f, 20.0f, 0.01f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f);
-		drawGroundPlane();
-		for (int i = 0; i < 5; i++) drawRobotAtRandom(i);
-		if (axies) drawAxies();
+		// === BIRD’S-EYE (F2 toggle small) ===
+		if (sceneCamOn) {
+			int w = WIN_W / 4;
+			int h = WIN_H / 4;
+			int x = WIN_W - w;
+			int y = WIN_H - h;
+			clearViewportArea(x, y, w, h);
+			glViewport(x, y, w, h);
+			Camera bird;
+			bird.x = 0.0f; bird.y = 20.0f; bird.z = 0.01f;
+			bird.lx = 0.0f; bird.lz = 0.0f;
+			renderSceneFromCamera(bird, w, h);
+		}
 	}
 
 	glutSwapBuffers();
 }
+
 
 int main(int argc, char** argv) {
 	glutInit(&argc, argv);
@@ -409,6 +482,8 @@ int main(int argc, char** argv) {
 	glutInitWindowSize(800, 600);
 	glutInitWindowPosition(0, 0);
 	glutCreateWindow("Andrew Trautzsch, 811198871");
+
+	initRobots(); // sets the robot posistion for all cameras
 
 	// menu and instruction helper functions
 	createMenus();
@@ -422,7 +497,7 @@ int main(int argc, char** argv) {
 	glutDisplayFunc(MyDisplay);
 	glutKeyboardFunc(keyboardInput);
 	glutMouseFunc(mouseInput);
-	glutSpecialFunc(specialKeys); // For camera movement
+	glutSpecialFunc(specialKeys); // For camera movement and switching
 
 	//
 	//////////// BONUS
