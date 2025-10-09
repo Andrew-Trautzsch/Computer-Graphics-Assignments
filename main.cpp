@@ -2,6 +2,8 @@
 Andrew Trautzsch - 811198871
 Animation and Game Design - Assignment 2 - Moving Cameras and Humanoid Robots
 
+Removed some un-needed features from previous assignment
+
 BONUS:
 Added a confetti particle system. Creates particles with pos and veloctiy above robots, which spreads and falls, once hitting y = -1, resets to a new posistion and repeats
 Can be toggled while dancing with 'f', set max of 100 particles at a time
@@ -46,8 +48,6 @@ float torsoBounce = 0.05f * sin(danceAngle * 3.14 / 180.0f);
 bool axies = false;
 State state = SOLID;
 bool clear = false;
-Vector3 globalRot(0.0, 0.0, 0.0);
-bool ortho = true;
 
 Vector3 torsoColor = getColor(BLUE);
 Vector3 headColor = getColor(YELLOW);
@@ -57,6 +57,7 @@ Vector3 legColor = getColor(RED);
 //
 //////////// BONUS - Improved Confetti (replace previous confetti code)
 //
+
 struct Particle {
 	float x, y, z;        // position
 	float r, g, b, a;     // color + alpha

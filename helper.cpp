@@ -57,7 +57,7 @@ void printInstructions() {
 
 	std::cout << "Camera Views (Function Keys):\n";
 	std::cout << "  F1 : Toggle rear view camera (top-left viewport)\n";
-	std::cout << "  F2 : Toggle bird’s-eye camera (top-right viewport)\n";
+	std::cout << "  F2 : Toggle birds-eye camera (top-right viewport)\n";
 	std::cout << "  F3 : Switch main display between First Person and Bird’s Eye view\n\n";
 
 	std::cout << "-------------------------------------------------------------------------------\n";
