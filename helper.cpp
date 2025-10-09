@@ -35,32 +35,39 @@ const char* getColorName(Color c) {
 
 // instructions on using program
 void printInstructions() {
-	std::cout << "================= Robot Controls =================\n";
+	std::cout << "================= Assignment 2: Moving Cameras & Humanoid Robots =================\n";
+	std::cout << "Author: Andrew Trautzsch (811198871)\n";
+	std::cout << "-------------------------------------------------------------------------------\n";
 	std::cout << "Keyboard Controls:\n";
-	std::cout << "  p : Vertex-only model\n";
-	std::cout << "  w : Wireframe model\n";
-	std::cout << "  s : Solid model\n";
-	std::cout << "  c : Clear screen toggle\n";
-	std::cout << "  a : Toggle axes on/off\n";
+	std::cout << "  p : Display vertex-only model of robots\n";
+	std::cout << "  w : Display wireframe model of robots\n";
+	std::cout << "  s : Display solid model of robots (default)\n";
+	std::cout << "  c : Toggle screen clearing (black background only)\n";
+	std::cout << "  a : Toggle axes display (X=Red, Y=Green, Z=Blue)\n";
 	std::cout << "  d : Toggle dancing animation on/off\n";
-	std::cout << "  m : Toggle music on/off\n";
-	std::cout << "  h : Play hello audio\n";
-	std::cout << "  j : Play dance audio\n";
-	std::cout << "  k : Play goodbye audio\n";
-	std::cout << "  q : Quit program\n\n";
+	std::cout << "  i : Toggle between group dancing and individual dancing\n";
+	std::cout << "  f : Toggle confetti particle system (only works while dancing)\n";
+	std::cout << "  q : Quit the program\n\n";
 
-	std::cout << "Mouse Controls:\n";
-	std::cout << "  Right click : Open popup menu\n";
-	std::cout << "  Left click  : Toggle between B&W and Color\n";
-	std::cout << "  Middle scroll : Zoom in/out\n\n";
+	std::cout << "Camera Controls (Arrow Keys):\n";
+	std::cout << "  UP    : Move camera forward\n";
+	std::cout << "  DOWN  : Move camera backward\n";
+	std::cout << "  LEFT  : Rotate camera left\n";
+	std::cout << "  RIGHT : Rotate camera right\n\n";
 
-	std::cout << "Menu Options:\n";
-	std::cout << "  - Rotate robot (angles 30-360) along X, Y, Z axes\n";
-	std::cout << "  - Projection: Orthographic (default) or Perspective\n";
-	std::cout << "  - Change body part colors (Head, Torso, Arms, Legs)\n\n";
+	std::cout << "Camera Views (Function Keys):\n";
+	std::cout << "  F1 : Toggle rear view camera (top-left viewport)\n";
+	std::cout << "  F2 : Toggle bird’s-eye camera (top-right viewport)\n";
+	std::cout << "  F3 : Switch main display between First Person and Bird’s Eye view\n\n";
 
-	std::cout << "==================================================\n";
+	std::cout << "-------------------------------------------------------------------------------\n";
+	std::cout << "Bonus Feature:\n";
+	std::cout << "  Confetti Particle System:\n";
+	std::cout << "   - Can be toggled during dancing with the 'f' key\n";
+	std::cout << "   - Spawns colorful confetti above robots that falls and resets\n";
+	std::cout << "   - Automatically turns off when dancing stops\n\n";
 }
+
 
 // used for dance animation
 void danceTimer(int value) {

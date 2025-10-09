@@ -9,6 +9,7 @@ This file consist of global variables, helpful datastructures, and helper functi
 #include <string>
 #include <iostream>
 #include <windows.h>
+#include <cstdlib>
 #include <mmsystem.h> // having only <windows.h> didnt include the playSound() function for me, so i needed to directed include this lib, which is a sub lib of windows.h
 
 
@@ -48,10 +49,6 @@ extern float torsoBounce;
 extern bool axies;
 extern State state;
 extern bool clear;
-extern bool BnW;
-extern Vector3 globalRot;
-extern float zoom;
-extern bool ortho;
 
 extern Vector3 torsoColor;
 extern Vector3 headColor;

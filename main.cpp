@@ -3,12 +3,8 @@ Andrew Trautzsch - 811198871
 Animation and Game Design - Assignment 2 - Moving Cameras and Humanoid Robots
 
 BONUS:
-Added 3 different voice audio clips, they can be played with keyboard input or they will play passively
-	h - hello audio
-	j - dance audio
-	l - goodbye audio
-
-hello will automatically play at program start, dance at dance start, and goodbye and program termination (with keyboard input q)
+Added a confetti particle system. Creates particles with pos and veloctiy above robots, which spreads and falls, once hitting y = -1, resets to a new posistion and repeats
+Can be toggled while dancing with 'f', set max of 100 particles at a time
 
 all sections that have bonus related code are marked with
 
@@ -57,6 +53,144 @@ Vector3 torsoColor = getColor(BLUE);
 Vector3 headColor = getColor(YELLOW);
 Vector3 armColor = getColor(GREEN);
 Vector3 legColor = getColor(RED);
+
+//
+//////////// BONUS - Improved Confetti (replace previous confetti code)
+//
+struct Particle {
+	float x, y, z;        // position
+	float r, g, b, a;     // color + alpha
+	float vx, vy, vz;     // velocity
+	float life;           // lifetime
+	int emitter;          // which robot it spawns from (0..4)
+	float seed;           // per-particle seed to keep consistent
+};
+
+const int MAX_PARTICLES = 100; // total particles
+Particle particles[MAX_PARTICLES];
+bool confettiActive = false;
+
+// confetti constants
+const float CONFETTI_SPAWN_HEIGHT = 5.5f;   // spawn above robot
+const float CONFETTI_SPAWN_RADIUS = 0.8f;   // how far from robot center confetti spawns
+const float CONFETTI_MIN_VY = -0.008f;      // initial vertical speed
+const float CONFETTI_MAX_VY = -0.02f;
+const float CONFETTI_GRAVITY = 0.00012f;    // gravity
+const float CONFETTI_DRIFT_AMPL = 0.012f;   // horizontal drift
+const float CONFETTI_POINT_SIZE = 4.5f;     // drawn size
+const float CONFETTI_ALPHA_MIN = 0.45f;
+const float CONFETTI_ALPHA_MAX = 0.85f;
+
+void initConfetti() {
+	for (int i = 0; i < MAX_PARTICLES; ++i) {
+		Particle& p = particles[i];
+
+		// choose a robot emitter so confetti comes from robots
+		p.emitter = rand() % 5;
+
+		// spawn roughly above that robot with slight random offset
+		float rx = ((rand() % 100) / 100.0f * 2.0f - 1.0f) * CONFETTI_SPAWN_RADIUS;
+		float rz = ((rand() % 100) / 100.0f * 2.0f - 1.0f) * CONFETTI_SPAWN_RADIUS;
+
+		// set initial coordinates
+		p.x = robotPositions[p.emitter].x + rx;
+		p.z = robotPositions[p.emitter].z + rz;
+		p.y = robotPositions[p.emitter].y + CONFETTI_SPAWN_HEIGHT + ((rand() % 100) / 200.0f); // small vertical jitter
+
+		// randomized initial velocities
+		p.vx = ((rand() % 100) / 100.0f) * 0.02f - 0.01f; // -0.01 .. 0.01
+		p.vz = ((rand() % 100) / 100.0f) * 0.02f - 0.01f;
+		p.vy = -(CONFETTI_MIN_VY + ((rand() % 100) / 100.0f) * (CONFETTI_MAX_VY - CONFETTI_MIN_VY));
+
+		// color + alpha
+		// always keeps a bright color
+		p.r = 0.5f + (rand() % 50) / 100.0f; // 0.5..1.0
+		p.g = 0.5f + (rand() % 50) / 100.0f;
+		p.b = 0.5f + (rand() % 50) / 100.0f;
+		p.a = CONFETTI_ALPHA_MIN + ((rand() % 100) / 100.0f) * (CONFETTI_ALPHA_MAX - CONFETTI_ALPHA_MIN);
+
+		// lifetime and seed set
+		p.life = 1.0f;
+		p.seed = (rand() % 1000) / 1000.0f * (2.0f*PI); // 0..2PI phase for each angle
+	}
+}
+
+// used for updating in main()
+void updateConfetti() {
+	if (!confettiActive) return;
+
+	// time based phase for movement
+	float t = (float)glutGet(GLUT_ELAPSED_TIME) / 1000.0f; // seconds
+
+	for (int i = 0; i < MAX_PARTICLES; ++i) {
+		Particle& p = particles[i];
+
+		// adds drift to confetti, used to help smooth jumps between updates
+		float driftX = sinf(t * 0.8f + p.seed) * CONFETTI_DRIFT_AMPL;
+		float driftZ = cosf(t * 0.6f + p.seed * 1.3f) * (CONFETTI_DRIFT_AMPL * 0.8f);
+
+		p.x += p.vx + driftX * 0.02f;
+		p.z += p.vz + driftZ * 0.02f;
+		p.y += p.vy; // only affected by gravity
+
+		// gravity
+		p.vy -= CONFETTI_GRAVITY;
+
+		// if a particle is below the floor, it is recreated and starts again
+		// this is is a copy of the above INIT function
+		if (p.y < -1.0f) { // below floor
+			p.emitter = rand() % 5;
+			float rx = ((rand() % 100) / 100.0f * 2.0f - 1.0f) * CONFETTI_SPAWN_RADIUS;
+			float rz = ((rand() % 100) / 100.0f * 2.0f - 1.0f) * CONFETTI_SPAWN_RADIUS;
+			p.x = robotPositions[p.emitter].x + rx;
+			p.z = robotPositions[p.emitter].z + rz;
+			p.y = robotPositions[p.emitter].y + CONFETTI_SPAWN_HEIGHT + ((rand() % 100) / 200.0f);
+
+			p.vx = ((rand() % 100) / 100.0f) * 0.02f - 0.01f;
+			p.vz = ((rand() % 100) / 100.0f) * 0.02f - 0.01f;
+			p.vy = -(CONFETTI_MIN_VY + ((rand() % 100) / 100.0f) * (CONFETTI_MAX_VY - CONFETTI_MIN_VY));
+
+			p.r = 0.5f + (rand() % 50) / 100.0f;
+			p.g = 0.5f + (rand() % 50) / 100.0f;
+			p.b = 0.5f + (rand() % 50) / 100.0f;
+			p.a = CONFETTI_ALPHA_MIN + ((rand() % 100) / 100.0f) * (CONFETTI_ALPHA_MAX - CONFETTI_ALPHA_MIN);
+
+			p.life = 1.0f;
+			p.seed = (rand() % 1000) / 1000.0f * 6.2831853f;
+		}
+	}
+}
+
+// Confetti is drawn for each camera to keep the same scene
+void drawConfetti() {
+	if (!confettiActive) return;
+
+	// save current enable state, color, and point size
+	glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_POINT_BIT);
+
+	// want confetti to render as bright translucent points regardless of lighting
+	glDisable(GL_LIGHTING);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	glPointSize(CONFETTI_POINT_SIZE);
+	glBegin(GL_POINTS);
+	for (int i = 0; i < MAX_PARTICLES; ++i) {
+		Particle& p = particles[i];
+		glColor4f(p.r, p.g, p.b, p.a);
+		glVertex3f(p.x, p.y, p.z);
+	}
+	glEnd();
+
+	// restore
+	glDisable(GL_BLEND);
+	glPopAttrib();
+}
+
+//
+////////////// BONUS END
+//
+
 
 // camera input
 void specialKeys(int key, int x, int y)
@@ -112,17 +246,31 @@ void keyboardInput(unsigned char input, int x, int y)
 	case 'd': // toggle dancing
 		dancing = !dancing;
 		if (dancing) {
-			glutTimerFunc(0, danceTimer, 0);  // start animation loop
-
-			// only play music if user has enabled it
-			PlaySound(TEXT("dance1.wav"), NULL, SND_FILENAME | SND_ASYNC | SND_LOOP);
-			
+			glutTimerFunc(0, danceTimer, 0);
+			PlaySound(TEXT("dance1.wav"), NULL, SND_FILENAME | SND_ASYNC);
 		}
 		else {
-			// stop music when dancing stops
 			PlaySound(NULL, 0, 0);
+			//
+			//////////// BONUS
+			//
+			confettiActive = false; // stop confetti automatically when dance stops
+			//
 		}
 		break;
+
+	//
+	//////////// BONUS
+	//
+	case 'f': // toggle confetti (only works if dancing)
+		if (dancing) {
+			confettiActive = !confettiActive;
+			if (confettiActive) {
+				initConfetti();
+			}
+		}
+		break;
+	//
 	case 'i':  // toggle between group and individual dancing
 		groupDance = !groupDance;
 		break;
@@ -324,6 +472,11 @@ void renderSceneFromCamera(Camera cam, int viewW, int viewH)
 	drawGroundPlane();
 	for (int i = 0; i < 5; i++) drawRobotAtRandom(i);
 	if (axies) drawAxies();
+	//
+	//////////// BONUS
+	//
+	drawConfetti();
+	//
 }
 
 void MyDisplay() {
@@ -426,6 +579,17 @@ int main(int argc, char** argv) {
 	// OpenGL setup
 	glClearColor(0.0, 0.0, 0.0, 1.0);
 	glEnable(GL_DEPTH_TEST);
+
+	//
+	//////////// BONUS
+	//
+	glutIdleFunc([]() {
+		if (confettiActive) {
+			updateConfetti();
+			glutPostRedisplay(); // redraw frame continuously
+		}
+		});
+	//
 
 	// Callbacks
 	glutDisplayFunc(MyDisplay);
