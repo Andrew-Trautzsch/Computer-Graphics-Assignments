@@ -62,63 +62,6 @@ void printInstructions() {
 	std::cout << "==================================================\n";
 }
 
-// creates angle, projection, and color menus
-void createMenus() {
-	// Rotation submenus
-	int angles[] = { 0,30,60,90,120,150,180,210,240,270,300,330,360 };
-	int xMenu = glutCreateMenu(rotateX);
-	for (int a : angles) glutAddMenuEntry(std::to_string(a).c_str(), a);
-	int yMenu = glutCreateMenu(rotateY);
-	for (int a : angles) glutAddMenuEntry(std::to_string(a).c_str(), a);
-	int zMenu = glutCreateMenu(rotateZ);
-	for (int a : angles) glutAddMenuEntry(std::to_string(a).c_str(), a);
-
-	// Projection submenu
-	int projectionMenu = glutCreateMenu(menuProjection);
-	glutAddMenuEntry("Orthographic", 1);
-	glutAddMenuEntry("Perspective", 2);
-
-	// Body part color submenus
-	Color colors[] = { RED, GREEN, BLUE, YELLOW, CYAN, MAGENTA, WHITE };
-	int torsoMenu = glutCreateMenu(setTorsoColor);
-	for (Color c : colors) glutAddMenuEntry(getColorName(c), c);
-	int headMenu = glutCreateMenu(setTorsoColor);
-	for (Color c : colors) glutAddMenuEntry(getColorName(c), c);
-	int armMenu = glutCreateMenu(setTorsoColor);
-	for (Color c : colors) glutAddMenuEntry(getColorName(c), c);
-	int legMenu = glutCreateMenu(setTorsoColor);
-	for (Color c : colors) glutAddMenuEntry(getColorName(c), c);
-
-	// Grouped Body Colors menu
-	int bodyColorMenu = glutCreateMenu([](int) {});
-	glutAddSubMenu("Torso", torsoMenu);
-	glutAddSubMenu("Head", headMenu);
-	glutAddSubMenu("Arms", armMenu);
-	glutAddSubMenu("Legs", legMenu);
-
-	// Main menu
-	int mainMenu = glutCreateMenu([](int) {});
-	glutAddSubMenu("Rotate X", xMenu);
-	glutAddSubMenu("Rotate Y", yMenu);
-	glutAddSubMenu("Rotate Z", zMenu);
-	glutAddSubMenu("Projection", projectionMenu);
-	glutAddSubMenu("Body Colors", bodyColorMenu);
-
-	// Attach to right mouse button
-	glutAttachMenu(GLUT_RIGHT_BUTTON);
-}
-
-// used for rotation menu
-void rotateX(int input) { globalRot.x = input; glutPostRedisplay(); }
-void rotateY(int input) { globalRot.y = input; glutPostRedisplay(); }
-void rotateZ(int input) { globalRot.z = input; glutPostRedisplay(); }
-
-// used for color menu
-void setTorsoColor(int c) { torsoColor = getColor((Color)c); glutPostRedisplay(); }
-void setHeadColor(int c) { headColor = getColor((Color)c); glutPostRedisplay(); }
-void setArmColor(int c) { armColor = getColor((Color)c); glutPostRedisplay(); }
-void setLegColor(int c) { legColor = getColor((Color)c); glutPostRedisplay(); }
-
 // used for dance animation
 void danceTimer(int value) {
 	if (dancing) {
@@ -128,29 +71,87 @@ void danceTimer(int value) {
 	}
 }
 
-// used for projection menu
-void menuProjection(int option) {
-	ortho = (option == 1);
-	glutPostRedisplay();
+// helper function for robot body creation
+void createObject(Shape type, Vector3 position, Vector3 rotation, Vector3 scale, Vector3 color)
+{
+	// If in wireframe mode, override color to white
+	if (state == WIRE)
+		color = Vector3(1.0f, 1.0f, 1.0f);
+
+	// starts matrix
+	glPushMatrix();
+
+	// Apply transformations
+	glColor3f(color.x, color.y, color.z);
+	glTranslatef(position.x, position.y, position.z);
+	glRotatef(rotation.x, 1, 0, 0);
+	glRotatef(rotation.y, 0, 1, 0);
+	glRotatef(rotation.z, 0, 0, 1);
+	glScalef(scale.x, scale.y, scale.z);
+
+	// Draw the correct object type
+	if (type == CUBE)
+	{
+		switch (state) {
+		case VERTEX:
+			glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
+			glPointSize(10.0f);  // creates points at all vertices
+			glutSolidCube(1.0);  // solid gives real vertices
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			break;
+		case WIRE:
+			glutWireCube(1.0);
+			break;
+		case SOLID:
+			glutSolidCube(1.0);
+			break;
+		}
+	}
+	else if (type == SPHERE)
+	{
+		switch (state) {
+		case VERTEX:
+			glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
+			glPointSize(5.0f);
+			glutSolidSphere(0.5, 16, 16);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			break;
+		case WIRE:
+			glutWireSphere(0.5, 16, 16);
+			break;
+		case SOLID:
+			glutSolidSphere(0.5, 16, 16);
+			break;
+		}
+	}
+
+	glPopMatrix(); // end object creation
 }
 
-//
-//////////// BONUS
-//
-// helper functions used for bonus
-
-// plays upon pushing h and program start
-void playHello() {
-	PlaySound(TEXT("hello.wav"), NULL, SND_FILENAME | SND_ASYNC);
+// Used to prevent overlap of primary camera and corner cameras
+void clearViewportArea(int x, int y, int w, int h) {
+	// Clears only the rectangle defined by (x,y,w,h)
+	glEnable(GL_SCISSOR_TEST);
+	glScissor(x, y, w, h);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glDisable(GL_SCISSOR_TEST);
 }
 
-// plays upon pushing j and on dance
-void playDance() {
-	PlaySound(TEXT("dance.wav"), NULL, SND_FILENAME | SND_ASYNC);
-}
+// initializes robot randomness (posistion and dance properties)
+void initRobots() {
+	srand((unsigned int)time(NULL));
+	for (int i = 0; i < 5; i++) {
+		// random positions in [-10,10)
+		robotPositions[i] = Vector3((rand() % 20) - 10, 0.0f, (rand() % 20) - 10);
 
-// plays upon pushing k and on program exit
-void playBye() {
-	PlaySound(TEXT("bye.wav"), NULL, SND_FILENAME | SND_ASYNC);
+		// Randomize dance parameters:
+		// Speed
+		robotSpeeds[i] = 0.8f + (rand() % 61) / 100.0f;
+
+		// Phase offset
+		robotOffsets[i] = (float)(rand() % 360);
+
+		// Dance type
+		robotTypes[i] = rand() % 5;
+	}
 }
-//

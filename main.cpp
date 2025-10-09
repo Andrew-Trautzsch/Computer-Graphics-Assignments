@@ -1,6 +1,6 @@
 /*
 Andrew Trautzsch - 811198871
-Animation and Game Design - Assignment 1 - Humanoid Robot
+Animation and Game Design - Assignment 2 - Moving Cameras and Humanoid Robots
 
 BONUS:
 Added 3 different voice audio clips, they can be played with keyboard input or they will play passively
@@ -28,17 +28,21 @@ Camera cam1 = { 0.0f, 1.0f, 5.0f, 0.0f, -1.0f, 0.0f }; // First Person
 Camera cam2 = { 0.0f, 1.0f, 5.0f, 0.0f, -1.0f, 0.0f }; // Rear View
 Camera cam3 = { 0.0f, 20.0f, 0.0f, 0.0f, 0.0f, 0.0f }; // Bird’s Eye
 
-#define PI 3.14159265f
+bool rearCamOn = true;
+bool sceneCamOn = true;
+bool camSwitch = false;
 
-// Per-robot dance parameters (one entry per robot)
-float robotSpeeds[5];   // multiplier for how fast each robot animates (e.g. 0.8 - 1.4)
+#define PI 3.14159265f // used for converting angles to radians
+
+// Randomness per robot for dance animations
+float robotSpeeds[5];   // multiplier for how fast each robot animates (0.8 - 1.4)
 float robotOffsets[5];  // phase offset in degrees (0 - 359)
-int   robotTypes[5];    // selects which distinct animation (0..4)
+int robotTypes[5];      // selects which distinct animation (0 - 4)
 Vector3 robotPositions[5];
 
 float cameraMS = 0.1f;
 
-bool dancing = false;  // toggled with 'd'
+bool dancing = false;
 bool groupDance = true;
 int danceAngle = 0;    // current frame of animation
 float torsoBounce = 0.05f * sin(danceAngle * 3.14 / 180.0f);
@@ -46,51 +50,45 @@ float torsoBounce = 0.05f * sin(danceAngle * 3.14 / 180.0f);
 bool axies = false;
 State state = SOLID;
 bool clear = false;
-bool BnW = false;
 Vector3 globalRot(0.0, 0.0, 0.0);
-float zoom = 1.0f;
 bool ortho = true;
-bool musicPlaying = false;
-
-bool rearCamOn = true;
-bool sceneCamOn = true;
-bool camSwitch = false;
 
 Vector3 torsoColor = getColor(BLUE);
 Vector3 headColor = getColor(YELLOW);
 Vector3 armColor = getColor(GREEN);
 Vector3 legColor = getColor(RED);
 
+// camera input
 void specialKeys(int key, int x, int y)
 {
 	switch (key) {
-	case GLUT_KEY_LEFT:
+	case GLUT_KEY_LEFT: // rotate camera left
 		cam1.angle -= 0.05f;
 		cam1.lx = sin(cam1.angle);
 		cam1.lz = -cos(cam1.angle);
 		break;
-	case GLUT_KEY_RIGHT:
+	case GLUT_KEY_RIGHT: // rotate camera right
 		cam1.angle += 0.05f;
 		cam1.lx = sin(cam1.angle);
 		cam1.lz = -cos(cam1.angle);
 		break;
-	case GLUT_KEY_UP:
+	case GLUT_KEY_UP: // move camera forward
 		cam1.x += cam1.lx * cameraMS;
 		cam1.z += cam1.lz * cameraMS;
 		break;
-	case GLUT_KEY_DOWN:
+	case GLUT_KEY_DOWN: // move camera backwards
 		cam1.x -= cam1.lx * cameraMS;
 		cam1.z -= cam1.lz * cameraMS;
 		break;
 
-	case GLUT_KEY_F1:
-		rearCamOn = !rearCamOn;     // toggle rear view
+	case GLUT_KEY_F1: // toggle rear view
+		rearCamOn = !rearCamOn;
 		break;
-	case GLUT_KEY_F2:
-		sceneCamOn = !sceneCamOn;   // toggle bird’s-eye
+	case GLUT_KEY_F2: // toggle bird’s-eye
+		sceneCamOn = !sceneCamOn;
 		break;
-	case GLUT_KEY_F3:
-		camSwitch = !camSwitch;     // toggle between FPV and ESV
+	case GLUT_KEY_F3: // toggle between camera types
+		camSwitch = !camSwitch;
 		break;
 	}
 
@@ -110,20 +108,15 @@ void keyboardInput(unsigned char input, int x, int y)
 	case 'c': // keeps display clear by preventing drawing
 		clear = !clear;
 		break;
+
 	case 'd': // toggle dancing
 		dancing = !dancing;
-		//
-		//////////// BONUS
-		//
-		playDance();
-		//
 		if (dancing) {
 			glutTimerFunc(0, danceTimer, 0);  // start animation loop
 
 			// only play music if user has enabled it
-			if (musicPlaying) {
-				PlaySound(TEXT("dance1.wav"), NULL, SND_FILENAME | SND_ASYNC | SND_LOOP);
-			}
+			PlaySound(TEXT("dance1.wav"), NULL, SND_FILENAME | SND_ASYNC | SND_LOOP);
+			
 		}
 		else {
 			// stop music when dancing stops
@@ -133,15 +126,7 @@ void keyboardInput(unsigned char input, int x, int y)
 	case 'i':  // toggle between group and individual dancing
 		groupDance = !groupDance;
 		break;
-	case 'm':
-		musicPlaying = !musicPlaying;
-		if (musicPlaying && dancing) {
-			PlaySound(TEXT("dance1.wav"), NULL, SND_FILENAME | SND_ASYNC | SND_LOOP);
-		}
-		else {
-			PlaySound(NULL, 0, 0); // stop
-		}
-		break;
+
 	case 'p': // sets vertex state
 		state = VERTEX;
 		break;
@@ -151,28 +136,8 @@ void keyboardInput(unsigned char input, int x, int y)
 	case 's': // sets solid state (default)
 		state = SOLID;
 		break;
-	//
-	//////////// BONUS
-	//
-	// manual keyboard inputs for audio
 
-	case 'h': // say hello
-		playHello();
-		break;
-	case 'j': // say dance
-		playDance();
-		break;
-	case 'k': // say bye
-		playBye();
-		break;
-	//
 	case 'q': // exits program
-		//
-		////////////// BONUS
-		//
-		playBye();
-		//
-		Sleep(1500);
 		exit(0);
 		break;
 	default:
@@ -181,205 +146,19 @@ void keyboardInput(unsigned char input, int x, int y)
 	glutPostRedisplay(); // for instantly updating graphics
 }
 
-/*
-Input: 0 = left btn, 2 = right btn, 3 = scroll up, 4 = scroll down
-/////
-Toggle: 0 = down, 1 = up
-*/
-void mouseInput(int button, int state, int x, int y) {
-	if (state != GLUT_DOWN) return; // only handle press, not release
-
-	switch (button) {
-	case GLUT_LEFT_BUTTON: // toggles color mode
-		BnW = !BnW;
-		break;
-	// right button un-needed as it is handled in createMenus()
-	case 3: // scroll up
-		zoom *= 0.9f;
-		break;
-	case 4: // scroll down
-		zoom *= 1.1f;
-		break;
-	}
-	glutPostRedisplay();
-}
-
 void drawAxies()
 {
 	glBegin(GL_LINES);
 	glColor3f(1, 0, 0); // X axis - Color
-	glVertex3f(0, 0, 0); glVertex3f(10, 0, 0); // Start and end
+	glVertex3f(0, 0, 0); glVertex3f(100, 0, 0); // Start and end
 	glColor3f(0, 1, 0); // Y axis
-	glVertex3f(0, 0, 0); glVertex3f(0, 10, 0);
+	glVertex3f(0, 0, 0); glVertex3f(0, 100, 0);
 	glColor3f(0, 0, 1); // Z axis
-	glVertex3f(0, 0, 0); glVertex3f(0, 0, 10);
+	glVertex3f(0, 0, 0); glVertex3f(0, 0, 100);
 	glEnd();
 }
 
-void createObject(Shape type, Vector3 position, Vector3 rotation, Vector3 scale, Vector3 color)
-{
-	// If in wireframe mode, override color to white
-	if (state == WIRE)
-		color = Vector3(1.0f, 1.0f, 1.0f);
-
-	// starts matrix
-	glPushMatrix();
-
-	// Apply transformations
-	glColor3f(color.x, color.y, color.z);
-	glTranslatef(position.x, position.y, position.z);
-	glRotatef(rotation.x, 1, 0, 0);
-	glRotatef(rotation.y, 0, 1, 0);
-	glRotatef(rotation.z, 0, 0, 1);
-	glScalef(scale.x, scale.y, scale.z);
-
-	// Draw the correct object type
-	if (type == CUBE)
-	{
-		switch (state) {
-		case VERTEX:
-			glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-			glPointSize(10.0f);  // creates points at all vertices
-			glutSolidCube(1.0);  // solid gives real vertices
-			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-			break;
-		case WIRE:
-			glutWireCube(1.0);
-			break;
-		case SOLID:
-			glutSolidCube(1.0);
-			break;
-		}
-	}
-	else if (type == SPHERE)
-	{
-		switch (state) {
-		case VERTEX:
-			glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-			glPointSize(5.0f);
-			glutSolidSphere(0.5, 16, 16);
-			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-			break;
-		case WIRE:
-			glutWireSphere(0.5, 16, 16);
-			break;
-		case SOLID:
-			glutSolidSphere(0.5, 16, 16);
-			break;
-		}
-	}
-
-	glPopMatrix(); // end object creation
-}
-
-// draws head, body, legs, and arms
-// Draws one robot using a localAngle (degrees) and a dance type to vary animations
-void drawRobot(float localAngle, int type)
-{
-	// compute torso bounce using sine of localAngle (convert to radians)
-	float torsoBounceLocal = 0.05f * sinf(localAngle * PI / 180.0f);
-
-	// We'll compute per-part transforms that vary by the 'type'
-	float headYrot = 0.0f;
-	float leftArmXrot = 0.0f;
-	float rightArmXrot = 0.0f;
-	float bodyYaw = 0.0f;
-	float lateralShift = 0.0f;
-	float leftLegXrot = 0.0f;
-	float rightLegXrot = 0.0f;
-
-	// common waving amount
-	float swing = (sinf(localAngle * PI / 180.0f) * 30.0f); // -30..30 deg
-	float kick = (sinf(localAngle * PI / 180.0f) * 40.0f); // -40..40 deg
-	float bob = (sinf(localAngle * PI / 180.0f) * 0.1f);  // -0.1..0.1 units
-
-	switch (type) {
-	case 0: // classic arm-swing dance (arms swing, head slight bob)
-		leftArmXrot = swing;
-		rightArmXrot = -swing;
-		headYrot = (sinf(localAngle * PI / 180.0f * 0.5f) * 10.0f); // gentle head turn
-		leftLegXrot = -swing * 0.5f;
-		rightLegXrot = swing * 0.5f;
-		break;
-	case 1: // head-bob + torso bounce
-		headYrot = (sinf(localAngle * PI / 180.0f * 2.0f) * 25.0f);
-		leftArmXrot = swing * 0.3f;
-		rightArmXrot = -swing * 0.3f;
-		break;
-	case 2: // leg-kick heavy
-		leftLegXrot = kick;
-		rightLegXrot = -kick;
-		leftArmXrot = kick * 0.25f;
-		rightArmXrot = -kick * 0.25f;
-		break;
-	case 3: // spin in place
-		bodyYaw = fmodf(localAngle * 2.0f, 360.0f); // faster spin
-		leftArmXrot = 20.0f * sinf(localAngle * PI / 180.0f);
-		rightArmXrot = -20.0f * sinf(localAngle * PI / 180.0f);
-		break;
-	case 4: // shuffle: small lateral shift + subtle arm movement
-		lateralShift = bob * 0.5f; // move left-right
-		leftArmXrot = swing * 0.4f;
-		rightArmXrot = -swing * 0.4f;
-		break;
-	default:
-		leftArmXrot = swing;
-		rightArmXrot = -swing;
-		break;
-	}
-
-	// Start drawing the robot using the computed transforms
-	glPushMatrix();
-
-	// Apply lateral shuffle
-	if (lateralShift != 0.0f) glTranslatef(lateralShift, 0.0f, 0.0f);
-
-	// Torso (blue) - include bounce
-	createObject(CUBE,
-		Vector3(0.0f, torsoBounceLocal, 0.0f),
-		Vector3(0.0f, bodyYaw, 0.0f),               // yaw the whole body if spinning
-		Vector3(0.8f, 1.0f, 0.4f),
-		BnW ? getColor(WHITE) : torsoColor);
-
-	// Head (yellow) - rotated around Y
-	createObject(CUBE,
-		Vector3(0.0f, 0.8f, 0.0f),
-		Vector3(0.0f, headYrot, 0.0f),
-		Vector3(0.6f, 0.6f, 0.6f),
-		BnW ? getColor(WHITE) : headColor);
-
-	// Left Arm (green) - rotation about X axis
-	createObject(CUBE,
-		Vector3(-0.55f, 0.0f, 0.0f),
-		Vector3(leftArmXrot, 0.0f, 0.0f),
-		Vector3(0.3f, 1.0f, 0.3f),
-		BnW ? getColor(WHITE) : armColor);
-
-	// Right Arm (green)
-	createObject(CUBE,
-		Vector3(0.55f, 0.0f, 0.0f),
-		Vector3(rightArmXrot, 0.0f, 0.0f),
-		Vector3(0.3f, 1.0f, 0.3f),
-		BnW ? getColor(WHITE) : armColor);
-
-	// Left Leg (red)
-	createObject(CUBE,
-		Vector3(-0.2f, -1.0f, 0.0f),
-		Vector3(leftLegXrot, 0.0f, 0.0f),
-		Vector3(0.3f, 1.0f, 0.3f),
-		BnW ? getColor(WHITE) : legColor);
-
-	// Right Leg (red)
-	createObject(CUBE,
-		Vector3(0.2f, -1.0f, 0.0f),
-		Vector3(rightLegXrot, 0.0f, 0.0f),
-		Vector3(0.3f, 1.0f, 0.3f),
-		BnW ? getColor(WHITE) : legColor);
-
-	glPopMatrix();
-}
-
-
+// Basic 100 x 100 dark-grey floor
 void drawGroundPlane() {
 	glColor3f(0.3f, 0.3f, 0.3f);
 	glBegin(GL_QUADS);
@@ -391,22 +170,112 @@ void drawGroundPlane() {
 
 }
 
-void initRobots() {
-	srand((unsigned int)time(NULL));
-	for (int i = 0; i < 5; i++) {
-		// random positions in [-10,10)
-		robotPositions[i] = Vector3((rand() % 20) - 10, 0.0f, (rand() % 20) - 10);
+// draws head, body, legs, and arms
+// Draws one robot using a localAngle (degrees) and a dance type to vary animations
+void drawRobot(float localAngle, int type)
+{
+	// compute torso bounce using sine of localAngle in radians
+	float torsoBounceLocal = 0.05f * sinf(localAngle * PI / 180.0f);
 
-		// Randomize dance parameters:
-		// Speed: 80% - 140% of base speed
-		robotSpeeds[i] = 0.8f + (rand() % 61) / 100.0f; // 0.8 .. 1.40
+	// rotation of each body part for unique dances
+	float headYrot = 0.0f;
+	float leftArmXrot = 0.0f;
+	float rightArmXrot = 0.0f;
+	float bodyYaw = 0.0f;
+	float lateralShift = 0.0f;
+	float leftLegXrot = 0.0f;
+	float rightLegXrot = 0.0f;
 
-		// Phase offset: 0 - 359 degrees
-		robotOffsets[i] = (float)(rand() % 360);
+	// different types of animations
+	float swing = (sinf(localAngle * PI / 180.0f) * 30.0f); // -30..30 deg
+	float kick = (sinf(localAngle * PI / 180.0f) * 40.0f); // -40..40 deg
+	float bob = (sinf(localAngle * PI / 180.0f) * 0.1f);  // -0.1..0.1 units
 
-		// Dance type: choose 0..4 (5 distinct animations)
-		robotTypes[i] = rand() % 5;
+	switch (type) {
+	case 0: // arms swing, head slight bob
+		leftArmXrot = swing;
+		rightArmXrot = -swing;
+		headYrot = (sinf(localAngle * PI / 180.0f * 0.5f) * 10.0f); // gentle head turn
+		leftLegXrot = -swing * 0.5f;
+		rightLegXrot = swing * 0.5f;
+		break;
+	case 1: // head-bob, torso bounce
+		headYrot = (sinf(localAngle * PI / 180.0f * 2.0f) * 25.0f);
+		leftArmXrot = swing * 0.3f;
+		rightArmXrot = -swing * 0.3f;
+		break;
+	case 2: // haevy leg-kick
+		leftLegXrot = kick;
+		rightLegXrot = -kick;
+		leftArmXrot = kick * 0.25f;
+		rightArmXrot = -kick * 0.25f;
+		break;
+	case 3: // spin in place
+		bodyYaw = fmodf(localAngle * 2.0f, 360.0f);
+		leftArmXrot = 20.0f * sinf(localAngle * PI / 180.0f);
+		rightArmXrot = -20.0f * sinf(localAngle * PI / 180.0f);
+		break;
+	case 4: // lateral shift, arm movement
+		lateralShift = bob * 0.5f;
+		leftArmXrot = swing * 0.4f;
+		rightArmXrot = -swing * 0.4f;
+		break;
+	default: // arm swing
+		leftArmXrot = swing;
+		rightArmXrot = -swing;
+		break;
 	}
+
+	// Start drawing the robot using the computed transforms
+	glPushMatrix();
+
+	// Apply lateral shuffle
+	if (lateralShift != 0.0f) glTranslatef(lateralShift, 0.0f, 0.0f);
+
+	// Dancing values from before implemented into body parts
+	// Torso (blue)
+	createObject(CUBE,
+		Vector3(0.0f, torsoBounceLocal, 0.0f),
+		Vector3(0.0f, bodyYaw, 0.0f),
+		Vector3(0.8f, 1.0f, 0.4f),
+		torsoColor);
+
+	// Head (yellow) - rotated around Y
+	createObject(CUBE,
+		Vector3(0.0f, 0.8f, 0.0f),
+		Vector3(0.0f, headYrot, 0.0f),
+		Vector3(0.6f, 0.6f, 0.6f),
+		headColor);
+
+	// Left Arm (green) - rotation about X axis
+	createObject(CUBE,
+		Vector3(-0.55f, 0.0f, 0.0f),
+		Vector3(leftArmXrot, 0.0f, 0.0f),
+		Vector3(0.3f, 1.0f, 0.3f),
+		armColor);
+
+	// Right Arm (green)
+	createObject(CUBE,
+		Vector3(0.55f, 0.0f, 0.0f),
+		Vector3(rightArmXrot, 0.0f, 0.0f),
+		Vector3(0.3f, 1.0f, 0.3f),
+		armColor);
+
+	// Left Leg (red)
+	createObject(CUBE,
+		Vector3(-0.2f, -1.0f, 0.0f),
+		Vector3(leftLegXrot, 0.0f, 0.0f),
+		Vector3(0.3f, 1.0f, 0.3f),
+		legColor);
+
+	// Right Leg (red)
+	createObject(CUBE,
+		Vector3(0.2f, -1.0f, 0.0f),
+		Vector3(rightLegXrot, 0.0f, 0.0f),
+		Vector3(0.3f, 1.0f, 0.3f),
+		legColor);
+
+	glPopMatrix();
 }
 
 void drawRobotAtRandom(int i) {
@@ -416,15 +285,11 @@ void drawRobotAtRandom(int i) {
 	float localAngle;
 	int danceType;
 
-	if (groupDance) {
-		// === GROUP DANCE MODE ===
-		// All robots share the same global danceAngle and danceType (e.g., type 0)
+	if (groupDance) { // All robots default to first dance
 		localAngle = danceAngle;
-		danceType = 0;  // You can change this to any dance style (0–4)
+		danceType = 0;
 	}
-	else {
-		// === INDIVIDUAL DANCE MODE ===
-		// Each robot dances independently using randomized parameters
+	else { // each robot has a unique dance
 		localAngle = danceAngle * robotSpeeds[i] + robotOffsets[i];
 		danceType = robotTypes[i];
 	}
@@ -443,105 +308,90 @@ void renderSceneFromCamera(Camera cam, int viewW, int viewH)
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	// special case: bird’s-eye camera (looking straight down)
-	if (cam.y > 5.0f && cam.lx == 0.0f && cam.lz == 0.0f) {
-		gluLookAt(cam.x, cam.y, cam.z,    // eye
-			cam.x, 0.0f, cam.z,     // center (downward)
-			0.0f, 0.0f, -1.0f);     // up vector points toward -Z
+	// special case to change angle for bird's eye
+	if (cam.y > 5.0f) {
+		gluLookAt(cam.x, cam.y, cam.z,
+			cam.x, 0.0f, cam.z,
+			0.0f, 0.0f, -1.0f);     
 	}
-	else {
-		// regular forward-facing camera
+	else { // default camera
 		gluLookAt(cam.x, cam.y, cam.z,
 			cam.x + cam.lx, cam.y, cam.z + cam.lz,
 			0.0f, 1.0f, 0.0f);
 	}
 
+	// draws robots and ground for each camera to keep same scene for all
 	drawGroundPlane();
 	for (int i = 0; i < 5; i++) drawRobotAtRandom(i);
 	if (axies) drawAxies();
 }
 
-
-void clearViewportArea(int x, int y, int w, int h) {
-	// Clears only the rectangle defined by (x,y,w,h)
-	glEnable(GL_SCISSOR_TEST);
-	glScissor(x, y, w, h); // coordinates in pixels
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glDisable(GL_SCISSOR_TEST);
-}
-
 void MyDisplay() {
-	// Clear the whole window first (safe start)
 	glViewport(0, 0, WIN_W, WIN_H);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	// If the user toggled screen clearing (c key) — keep the screen blank
+	// clear screen
 	if (clear) {
-		// We've already cleared; just present the black screen
 		glutSwapBuffers();
 		return;
 	}
 
-	// === MAIN VIEW (either FPV or Bird's eye depending on camSwitch) ===
-	if (camSwitch) {
-		// Bird’s-eye as the main (full window)
-		// Clear main viewport explicitly (redundant but safe)
+	if (camSwitch) { // special case of cameras (Bird's Eye POV is primary)
 		clearViewportArea(0, 0, WIN_W, WIN_H);
 
 		glViewport(0, 0, WIN_W, WIN_H);
-		// reuse renderSceneFromCamera but with appropriate size
-		Camera bird = cam3; // or compute/lookat inline if you prefer
-		// manually set bird's look if desired or use current cam3
-		renderSceneFromCamera(bird, WIN_W, WIN_H);
+		renderSceneFromCamera(cam3, WIN_W, WIN_H);
 
-		// small camera windows (only if toggled on)
+		// First Person POV camera - Top Right
 		if (sceneCamOn) {
-			// small view in upper-left (quarter size)
-			int w = WIN_W / 4; // 200
-			int h = WIN_H / 4; // 150
+			int w = WIN_W / 4;
+			int h = WIN_H / 4;
 			int x = WIN_W - w;
 			int y = WIN_H - h;
+
 			clearViewportArea(x, y, w, h);
 			glViewport(x, y, w, h);
-			renderSceneFromCamera(cam1, w, h); // show FPV scaled down
+			renderSceneFromCamera(cam1, w, h);
 		}
 
+		// Rear View POV camera - Top Left
 		if (rearCamOn) {
 			int w = WIN_W / 4;
 			int h = WIN_H / 4;
 			int x = 0;
 			int y = WIN_H - h;
-			// prepare the rear camera (rotate 180deg)
+			clearViewportArea(x, y, w, h);
+			glViewport(x, y, w, h);
+
 			Camera rear = cam2;
 			rear.angle += 3.14159f;
 			rear.lx = sin(rear.angle);
 			rear.lz = -cos(rear.angle);
-			clearViewportArea(x, y, w, h);
-			glViewport(x, y, w, h);
 			renderSceneFromCamera(rear, w, h);
 		}
 	}
-	else {
-		// Normal first-person view as main
+	else { // default case of cameras (First Person POV is primary)
 		clearViewportArea(0, 0, WIN_W, WIN_H);
 		glViewport(0, 0, WIN_W, WIN_H);
 		renderSceneFromCamera(cam1, WIN_W, WIN_H);
 
+		// Rear View POV camera - Top Left
 		if (rearCamOn) {
 			int w = WIN_W / 4;
 			int h = WIN_H / 4;
 			int x = 0;
 			int y = WIN_H - h;
+			clearViewportArea(x, y, w, h);
+			glViewport(x, y, w, h);
+
 			Camera rear = cam2;
 			rear.angle += 3.14159f;
 			rear.lx = sin(rear.angle);
 			rear.lz = -cos(rear.angle);
-			clearViewportArea(x, y, w, h);
-			glViewport(x, y, w, h);
 			renderSceneFromCamera(rear, w, h);
 		}
 
-		// === BIRD’S-EYE (F2 toggle small) ===
+		// Bird's Eye POV camera - Top Right
 		if (sceneCamOn) {
 			int w = WIN_W / 4;
 			int h = WIN_H / 4;
@@ -549,6 +399,7 @@ void MyDisplay() {
 			int y = WIN_H - h;
 			clearViewportArea(x, y, w, h);
 			glViewport(x, y, w, h);
+
 			Camera bird;
 			bird.x = 0.0f; bird.y = 20.0f; bird.z = 0.01f;
 			bird.lx = 0.0f; bird.lz = 0.0f;
@@ -569,8 +420,7 @@ int main(int argc, char** argv) {
 
 	initRobots(); // sets the robot posistion for all cameras
 
-	// menu and instruction helper functions
-	createMenus();
+	// instruction helper functions
 	printInstructions();
 
 	// OpenGL setup
@@ -580,14 +430,7 @@ int main(int argc, char** argv) {
 	// Callbacks
 	glutDisplayFunc(MyDisplay);
 	glutKeyboardFunc(keyboardInput);
-	glutMouseFunc(mouseInput);
 	glutSpecialFunc(specialKeys); // For camera movement and switching
-
-	//
-	//////////// BONUS
-	//
-	playHello();
-	//
 	
 	glutMainLoop();
 	return 0;
