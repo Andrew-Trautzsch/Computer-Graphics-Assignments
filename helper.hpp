@@ -9,6 +9,7 @@ This file consist of global variables, helpful datastructures, and helper functi
 #include <string>
 #include <iostream>
 #include <windows.h>
+#include <cstdlib>
 #include <mmsystem.h> // having only <windows.h> didnt include the playSound() function for me, so i needed to directed include this lib, which is a sub lib of windows.h
 
 
@@ -35,6 +36,12 @@ enum Color {
 	RED, GREEN, BLUE, YELLOW, CYAN, MAGENTA, WHITE
 };
 
+struct Camera {
+	float x, y, z; // Position
+	float lx, lz;  // Look direction, only need x and z
+	float angle;   // Rotation angle in 
+};
+
 extern bool dancing;
 extern int danceAngle;
 extern float torsoBounce;
@@ -42,42 +49,26 @@ extern float torsoBounce;
 extern bool axies;
 extern State state;
 extern bool clear;
-extern bool BnW;
-extern Vector3 globalRot;
-extern float zoom;
-extern bool ortho;
-extern bool musicPlaying;
 
 extern Vector3 torsoColor;
 extern Vector3 headColor;
 extern Vector3 armColor;
 extern Vector3 legColor;
 
+extern float robotSpeeds[5];
+extern float robotOffsets[5];
+extern int robotTypes[5];
+extern Vector3 robotPositions[5];
+
 Vector3 getColor(Color c);
 const char* getColorName(Color c);
 void printInstructions();
-void createMenus();
-
-void rotateX(int input);
-void rotateY(int input);
-void rotateZ(int input);
-
-void setTorsoColor(int c);
-void setHeadColor(int c);
-void setArmColor(int c);
-void setLegColor(int c);
 
 void danceTimer(int value);
 
-void menuProjection(int option);
+void createObject(Shape type, Vector3 position, Vector3 rotation, Vector3 scale, Vector3 color);
 
-//
-//////////// BONUS
-//
-// helper function prototypes
-void playHello();
-void playDance();
-void playBye();
-//
+void clearViewportArea(int x, int y, int w, int h);
+void initRobots();
 
 #endif

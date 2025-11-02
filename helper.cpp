@@ -35,89 +35,39 @@ const char* getColorName(Color c) {
 
 // instructions on using program
 void printInstructions() {
-	std::cout << "================= Robot Controls =================\n";
+	std::cout << "================= Assignment 2: Moving Cameras & Humanoid Robots =================\n";
+	std::cout << "Author: Andrew Trautzsch (811198871)\n";
+	std::cout << "-------------------------------------------------------------------------------\n";
 	std::cout << "Keyboard Controls:\n";
-	std::cout << "  p : Vertex-only model\n";
-	std::cout << "  w : Wireframe model\n";
-	std::cout << "  s : Solid model\n";
-	std::cout << "  c : Clear screen toggle\n";
-	std::cout << "  a : Toggle axes on/off\n";
+	std::cout << "  p : Display vertex-only model of robots\n";
+	std::cout << "  w : Display wireframe model of robots\n";
+	std::cout << "  s : Display solid model of robots (default)\n";
+	std::cout << "  c : Toggle screen clearing (black background only)\n";
+	std::cout << "  a : Toggle axes display (X=Red, Y=Green, Z=Blue)\n";
 	std::cout << "  d : Toggle dancing animation on/off\n";
-	std::cout << "  m : Toggle music on/off\n";
-	std::cout << "  h : Play hello audio\n";
-	std::cout << "  j : Play dance audio\n";
-	std::cout << "  k : Play goodbye audio\n";
-	std::cout << "  q : Quit program\n\n";
+	std::cout << "  i : Toggle between group dancing and individual dancing\n";
+	std::cout << "  f : Toggle confetti particle system (only works while dancing)\n";
+	std::cout << "  q : Quit the program\n\n";
 
-	std::cout << "Mouse Controls:\n";
-	std::cout << "  Right click : Open popup menu\n";
-	std::cout << "  Left click  : Toggle between B&W and Color\n";
-	std::cout << "  Middle scroll : Zoom in/out\n\n";
+	std::cout << "Camera Controls (Arrow Keys):\n";
+	std::cout << "  UP    : Move camera forward\n";
+	std::cout << "  DOWN  : Move camera backward\n";
+	std::cout << "  LEFT  : Rotate camera left\n";
+	std::cout << "  RIGHT : Rotate camera right\n\n";
 
-	std::cout << "Menu Options:\n";
-	std::cout << "  - Rotate robot (angles 30-360) along X, Y, Z axes\n";
-	std::cout << "  - Projection: Orthographic (default) or Perspective\n";
-	std::cout << "  - Change body part colors (Head, Torso, Arms, Legs)\n\n";
+	std::cout << "Camera Views (Function Keys):\n";
+	std::cout << "  F1 : Toggle rear view camera (top-left viewport)\n";
+	std::cout << "  F2 : Toggle birds-eye camera (top-right viewport)\n";
+	std::cout << "  F3 : Switch main display between First Person and Bird’s Eye view\n\n";
 
-	std::cout << "==================================================\n";
+	std::cout << "-------------------------------------------------------------------------------\n";
+	std::cout << "Bonus Feature:\n";
+	std::cout << "  Confetti Particle System:\n";
+	std::cout << "   - Can be toggled during dancing with the 'f' key\n";
+	std::cout << "   - Spawns colorful confetti above robots that falls and resets\n";
+	std::cout << "   - Automatically turns off when dancing stops\n\n";
 }
 
-// creates angle, projection, and color menus
-void createMenus() {
-	// Rotation submenus
-	int angles[] = { 0,30,60,90,120,150,180,210,240,270,300,330,360 };
-	int xMenu = glutCreateMenu(rotateX);
-	for (int a : angles) glutAddMenuEntry(std::to_string(a).c_str(), a);
-	int yMenu = glutCreateMenu(rotateY);
-	for (int a : angles) glutAddMenuEntry(std::to_string(a).c_str(), a);
-	int zMenu = glutCreateMenu(rotateZ);
-	for (int a : angles) glutAddMenuEntry(std::to_string(a).c_str(), a);
-
-	// Projection submenu
-	int projectionMenu = glutCreateMenu(menuProjection);
-	glutAddMenuEntry("Orthographic", 1);
-	glutAddMenuEntry("Perspective", 2);
-
-	// Body part color submenus
-	Color colors[] = { RED, GREEN, BLUE, YELLOW, CYAN, MAGENTA, WHITE };
-	int torsoMenu = glutCreateMenu(setTorsoColor);
-	for (Color c : colors) glutAddMenuEntry(getColorName(c), c);
-	int headMenu = glutCreateMenu(setTorsoColor);
-	for (Color c : colors) glutAddMenuEntry(getColorName(c), c);
-	int armMenu = glutCreateMenu(setTorsoColor);
-	for (Color c : colors) glutAddMenuEntry(getColorName(c), c);
-	int legMenu = glutCreateMenu(setTorsoColor);
-	for (Color c : colors) glutAddMenuEntry(getColorName(c), c);
-
-	// Grouped Body Colors menu
-	int bodyColorMenu = glutCreateMenu([](int) {});
-	glutAddSubMenu("Torso", torsoMenu);
-	glutAddSubMenu("Head", headMenu);
-	glutAddSubMenu("Arms", armMenu);
-	glutAddSubMenu("Legs", legMenu);
-
-	// Main menu
-	int mainMenu = glutCreateMenu([](int) {});
-	glutAddSubMenu("Rotate X", xMenu);
-	glutAddSubMenu("Rotate Y", yMenu);
-	glutAddSubMenu("Rotate Z", zMenu);
-	glutAddSubMenu("Projection", projectionMenu);
-	glutAddSubMenu("Body Colors", bodyColorMenu);
-
-	// Attach to right mouse button
-	glutAttachMenu(GLUT_RIGHT_BUTTON);
-}
-
-// used for rotation menu
-void rotateX(int input) { globalRot.x = input; glutPostRedisplay(); }
-void rotateY(int input) { globalRot.y = input; glutPostRedisplay(); }
-void rotateZ(int input) { globalRot.z = input; glutPostRedisplay(); }
-
-// used for color menu
-void setTorsoColor(int c) { torsoColor = getColor((Color)c); glutPostRedisplay(); }
-void setHeadColor(int c) { headColor = getColor((Color)c); glutPostRedisplay(); }
-void setArmColor(int c) { armColor = getColor((Color)c); glutPostRedisplay(); }
-void setLegColor(int c) { legColor = getColor((Color)c); glutPostRedisplay(); }
 
 // used for dance animation
 void danceTimer(int value) {
@@ -128,29 +78,87 @@ void danceTimer(int value) {
 	}
 }
 
-// used for projection menu
-void menuProjection(int option) {
-	ortho = (option == 1);
-	glutPostRedisplay();
+// helper function for robot body creation
+void createObject(Shape type, Vector3 position, Vector3 rotation, Vector3 scale, Vector3 color)
+{
+	// If in wireframe mode, override color to white
+	if (state == WIRE)
+		color = Vector3(1.0f, 1.0f, 1.0f);
+
+	// starts matrix
+	glPushMatrix();
+
+	// Apply transformations
+	glColor3f(color.x, color.y, color.z);
+	glTranslatef(position.x, position.y, position.z);
+	glRotatef(rotation.x, 1, 0, 0);
+	glRotatef(rotation.y, 0, 1, 0);
+	glRotatef(rotation.z, 0, 0, 1);
+	glScalef(scale.x, scale.y, scale.z);
+
+	// Draw the correct object type
+	if (type == CUBE)
+	{
+		switch (state) {
+		case VERTEX:
+			glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
+			glPointSize(10.0f);  // creates points at all vertices
+			glutSolidCube(1.0);  // solid gives real vertices
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			break;
+		case WIRE:
+			glutWireCube(1.0);
+			break;
+		case SOLID:
+			glutSolidCube(1.0);
+			break;
+		}
+	}
+	else if (type == SPHERE)
+	{
+		switch (state) {
+		case VERTEX:
+			glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
+			glPointSize(5.0f);
+			glutSolidSphere(0.5, 16, 16);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			break;
+		case WIRE:
+			glutWireSphere(0.5, 16, 16);
+			break;
+		case SOLID:
+			glutSolidSphere(0.5, 16, 16);
+			break;
+		}
+	}
+
+	glPopMatrix(); // end object creation
 }
 
-//
-//////////// BONUS
-//
-// helper functions used for bonus
-
-// plays upon pushing h and program start
-void playHello() {
-	PlaySound(TEXT("hello.wav"), NULL, SND_FILENAME | SND_ASYNC);
+// Used to prevent overlap of primary camera and corner cameras
+void clearViewportArea(int x, int y, int w, int h) {
+	// Clears only the rectangle defined by (x,y,w,h)
+	glEnable(GL_SCISSOR_TEST);
+	glScissor(x, y, w, h);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glDisable(GL_SCISSOR_TEST);
 }
 
-// plays upon pushing j and on dance
-void playDance() {
-	PlaySound(TEXT("dance.wav"), NULL, SND_FILENAME | SND_ASYNC);
-}
+// initializes robot randomness (posistion and dance properties)
+void initRobots() {
+	srand((unsigned int)time(NULL));
+	for (int i = 0; i < 5; i++) {
+		// random positions in [-10,10)
+		robotPositions[i] = Vector3((rand() % 20) - 10, 0.0f, (rand() % 20) - 10);
 
-// plays upon pushing k and on program exit
-void playBye() {
-	PlaySound(TEXT("bye.wav"), NULL, SND_FILENAME | SND_ASYNC);
+		// Randomize dance parameters:
+		// Speed
+		robotSpeeds[i] = 0.8f + (rand() % 61) / 100.0f;
+
+		// Phase offset
+		robotOffsets[i] = (float)(rand() % 360);
+
+		// Dance type
+		robotTypes[i] = rand() % 5;
+	}
 }
-//
