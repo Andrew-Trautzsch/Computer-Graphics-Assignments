@@ -39,6 +39,14 @@ struct Camera {
     float angle;   // Rotation angle (radians) for FPV
 };
 
+struct Bullet {
+    Vector3 pos;
+    Vector3 dir;
+    float speed;
+    bool active;
+    bool hit;
+};
+
 // Externs provided/owned by main.cpp
 extern int WIN_W;
 extern int WIN_H;
@@ -87,5 +95,7 @@ void initRobots();
 
 // Simple bitmap text utility for HUD
 void drawBitmapString(float x, float y, const std::string& text, void* font = GLUT_BITMAP_HELVETICA_18);
+
+
 
 #endif

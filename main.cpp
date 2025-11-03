@@ -14,6 +14,10 @@ Added:
 - Arcball Camera (ESV only): Left-drag rotate, Right-drag zoom
 - Enemy Robot Motion (toggle 'm')
 - Cleaned HUD (no instructions, printed to terminal)
+
+BONUS:
+- winmm sound: looping BGM, shoot and hit SFX (with BGM resume)
+- Simple AI: random walking; 'm' toggles jumping to disrupt aiming
 */
 
 #include "helper.hpp"
@@ -44,10 +48,9 @@ int lastMouseX = 0, lastMouseY = 0;
 bool leftDragging = false, rightDragging = false;
 
 // ===== Game State =====
-bool dancing = false;
-int danceTimerDelay = 50;
-bool groupDance = true;
-int danceAngle = 0;
+bool dancing = false;           // NOW means "jumping" mode for disruption
+bool groupDance = true;         // kept for local leg/arm swing calc
+int  danceAngle = 0;            // also used for subtle limb swing
 float torsoBounce = 0.05f * sinf(danceAngle * PI / 180.0f);
 
 bool axies = false;
@@ -61,37 +64,76 @@ Vector3 armColor = getColor(GREEN);
 Vector3 legColor = getColor(RED);
 
 // ===== Robot Data =====
-std::vector<float> robotSpeeds;
-std::vector<float> robotOffsets;
-std::vector<int> robotTypes;
+std::vector<float>   robotSpeeds;     // reused: base speed (also in old local swing)
+std::vector<float>   robotOffsets;
+std::vector<int>     robotTypes;
 std::vector<Vector3> robotPositions;
-std::vector<float> robotHitTimers;
-std::vector<bool> robotAlive;
-bool confettiActive = false;
+std::vector<bool>    robotAlive;
+std::vector<float>   robotJumpPhase;  // phase accumulator for jumping
+std::vector<float>   robotYOffset;    // current vertical offset from jump
 
 // ===== Bounding Spheres =====
-std::vector<float> robotRadii;
+std::vector<float> robotRadi;
 bool showColliders = false;
 
 // ===== Scoring / Mission =====
-int killCount = 0;
-int score = 0;
+int  killCount = 0;
+int  score = 0;
 bool gameOver = false;
-int startTime = 0;
+int  startTime = 0;
 std::string missionMsg = "";
 
 // ===== Bullets =====
-struct Bullet {
-    Vector3 pos;
-    Vector3 dir;
-    float speed;
-    bool active;
-    bool hit;
-};
 std::vector<Bullet> bullets;
-int bulletMode = 0;
+int   bulletMode = 0;
 float bulletSpeeds[3] = { 0.05f, 0.15f, 0.3f };
 std::string bulletLabels[3] = { "slow", "fast", "very fast" };
+
+//
+//////////// BONUS
+//
+std::vector<Vector3> robotDirs;
+
+static float frand(float a, float b) {
+    return a + (b - a) * (float(rand()) / float(RAND_MAX));
+}
+static Vector3 randDir2D() {
+    float x = frand(-1.0f, 1.0f);
+    float z = frand(-1.0f, 1.0f);
+    float len = std::sqrt(x * x + z * z);
+    if (len < 1e-3f) return Vector3(1, 0, 0);
+    return Vector3(x / len, 0, z / len);
+}
+
+const TCHAR* SOUND_BGM = TEXT("bgm.wav");
+const TCHAR* SOUND_SHOOT = TEXT("shoot.wav");
+const TCHAR* SOUND_HIT = TEXT("hit.wav");
+
+// Forward for BGM resume timer
+void bgmResumeTimer(int);
+
+// Sound helpers
+void PlayBGMStart() {
+    // Loop BGM; SND_FILENAME so it loads file, not alias
+    PlaySound(SOUND_BGM, NULL, SND_ASYNC | SND_LOOP | SND_FILENAME);
+}
+void PlayShoot() {
+    // One-shot; then resume BGM shortly after to avoid silence
+    PlaySound(SOUND_SHOOT, NULL, SND_ASYNC | SND_FILENAME);
+    glutTimerFunc(220, bgmResumeTimer, 0);
+}
+void PlayHit() {
+    PlaySound(SOUND_HIT, NULL, SND_ASYNC | SND_FILENAME);
+    glutTimerFunc(280, bgmResumeTimer, 0);
+}
+void StopAllSounds() {
+    PlaySound(NULL, 0, 0);
+}
+void bgmResumeTimer(int) {
+    // If game not over, keep BGM going
+    if (!gameOver) PlayBGMStart();
+}
+//
 
 // ===== Function Prototypes =====
 void updateArcballCamera();
@@ -161,8 +203,8 @@ void drawColliders() {
     for (int i = 0; i < ROBOT_COUNT; i++) {
         if (!robotAlive[i]) continue;
         glPushMatrix();
-        glTranslatef(robotPositions[i].x, 0.0f, robotPositions[i].z);
-        glutWireSphere(robotRadii[i], 10, 10);
+        glTranslatef(robotPositions[i].x, robotYOffset[i], robotPositions[i].z);
+        glutWireSphere(robotRadi[i], 10, 10);
         glPopMatrix();
     }
 }
@@ -189,7 +231,7 @@ void updateBullets() {
             float dz = b.pos.z - robotPositions[i].z;
             float dist = sqrtf(dx * dx + dz * dz);
             float bulletRadius = 0.1f;
-            float combined = bulletRadius + robotRadii[i];
+            float combined = bulletRadius + robotRadi[i];
 
             if (dist < combined) {
                 robotHitTimers[i] = 1.0f;
@@ -198,16 +240,14 @@ void updateBullets() {
                 b.hit = true;
                 killCount++;
                 score += 10;
-                PlaySound(TEXT("SystemAsterisk"), NULL, SND_ALIAS | SND_ASYNC);
+
+                //
+                //////////// BONUS
+                //
+                PlayHit();
+                //
                 break;
             }
-        }
-    }
-
-    for (int i = 0; i < ROBOT_COUNT; i++) {
-        if (robotHitTimers[i] > 0.0f) {
-            robotHitTimers[i] -= 0.016f;
-            if (robotHitTimers[i] < 0.0f) robotHitTimers[i] = 0.0f;
         }
     }
 
@@ -216,6 +256,53 @@ void updateBullets() {
         missionMsg = "Mission Complete!";
     }
 }
+
+//
+//////////// BONUS
+//
+void updateRobotMotion() {
+    if (gameOver) return;
+
+    // Walk bounds (slightly inside ground so they don't step off visually)
+    const float XZ_MIN = -95.0f;
+    const float XZ_MAX = 95.0f;
+
+    for (int i = 0; i < ROBOT_COUNT; ++i) {
+        if (!robotAlive[i]) continue;
+
+        // Jumping disrupt mode when 'm' is on
+        if (dancing) {
+            robotJumpPhase[i] += 0.08f + 0.12f * robotSpeeds[i];   // slower frequency
+            float s = std::sin(robotJumpPhase[i] * 0.05f);
+            robotYOffset[i] = (s > 0.0f ? s * 2.0f : 0.0f);        // higher amplitude
+        }
+        else {
+            robotYOffset[i] = 0.0f;
+
+            float walkSpeed = 0.002f + 0.002f * robotSpeeds[i];
+            robotPositions[i].x += robotDirs[i].x * walkSpeed;
+            robotPositions[i].z += robotDirs[i].z * walkSpeed;
+
+            // Occasionally pick a new direction
+            if ((rand() % 200) == 0) {
+                robotDirs[i] = randDir2D();
+            }
+
+            // Bounce off bounds
+            if (robotPositions[i].x < XZ_MIN || robotPositions[i].x > XZ_MAX) {
+                robotDirs[i].x = -robotDirs[i].x;
+                robotPositions[i].x = std::max(std::min(robotPositions[i].x, XZ_MAX), XZ_MIN);
+            }
+            if (robotPositions[i].z < XZ_MIN || robotPositions[i].z > XZ_MAX) {
+                robotDirs[i].z = -robotDirs[i].z;
+                robotPositions[i].z = std::max(std::min(robotPositions[i].z, XZ_MAX), XZ_MIN);
+            }
+        }
+    }
+
+    danceAngle = (danceAngle + 3) % 360;
+}
+//
 
 // ===== Arcball =====
 void updateArcballCamera() {
@@ -258,6 +345,8 @@ void drawRobot(float localAngle, int type, int i) {
     if (robotHitTimers[i] > 0.0f) { bodyCol = Vector3(1, 0, 0); legCol = Vector3(1, 0, 0); }
 
     glPushMatrix();
+    glTranslatef(0.0f, robotYOffset[i], 0.0f);
+
     createObject(CUBE, Vector3(0, torsoBounceLocal, 0), Vector3(0, 0, 0), Vector3(0.8f, 1.0f, 0.4f), bodyCol);
     createObject(CUBE, Vector3(0, 0.8f, 0), Vector3(0, 0, 0), Vector3(0.6f, 0.6f, 0.6f), headColor);
     createObject(CUBE, Vector3(-0.55f, 0, 0), Vector3(leftArmXrot, 0, 0), Vector3(0.3f, 1.0f, 0.3f), armColor);
@@ -270,7 +359,7 @@ void drawRobot(float localAngle, int type, int i) {
 void drawRobotAtIndex(int i) {
     if (!robotAlive[i]) return;
     glPushMatrix();
-    glTranslatef(robotPositions[i].x, 0, robotPositions[i].z);
+    glTranslatef(robotPositions[i].x, 0.0f, robotPositions[i].z);
     float localAngle = groupDance ? danceAngle : danceAngle * robotSpeeds[i] + robotOffsets[i];
     drawRobot(localAngle, 0, i);
     glPopMatrix();
@@ -304,6 +393,7 @@ void drawHUDViewport() {
 
     float step = (float)hudH / 6;
     float y = hudH - step;
+    // used to keep text well fit on hud
     void* font = (hudH > 100) ? GLUT_BITMAP_HELVETICA_18 : GLUT_BITMAP_HELVETICA_12;
 
     drawBitmapString(10, y, "Robot Hunter", font);
@@ -358,7 +448,14 @@ void MyDisplay() {
         missionMsg = (killCount == ROBOT_COUNT) ? "Mission Complete!" : "Mission Fail!";
     }
 
-    if (!gameOver) updateBullets();
+    if (!gameOver) {
+        //
+        //////////// BONUS
+        //
+        updateRobotMotion();
+        //
+        updateBullets();
+    }
     drawHUDViewport();
     drawMainViewport();
     glutSwapBuffers();
@@ -376,7 +473,16 @@ void keyboardInput(unsigned char key, int, int) {
     case 'c': showColliders = !showColliders; break;
     case 'a': axies = !axies; break;
     case 'b': bulletMode = (bulletMode + 1) % 3; break;
-    case 'm': dancing = !dancing; if (dancing) glutTimerFunc(danceTimerDelay, danceTimer, 0); break;
+    case 'm':
+        dancing = !dancing;
+        // reset phases for crisp start/stop of jumping
+        if (dancing) {
+            for (int i = 0; i < ROBOT_COUNT; ++i) robotJumpPhase[i] = frand(0.0f, 100.0f);
+        }
+        else {
+            for (int i = 0; i < ROBOT_COUNT; ++i) robotYOffset[i] = 0.0f;
+        }
+        break;
 
     case ' ': {
         Bullet b;
@@ -386,9 +492,22 @@ void keyboardInput(unsigned char key, int, int) {
         b.active = true;
         b.hit = false;
         bullets.push_back(b);
+
+        //
+        //////////// BONUS
+        //
+        PlayShoot();
+        //
     } break;
 
-    case 27: exit(0); break;
+    case 27:
+        //
+        //////////// BONUS
+        //
+        StopAllSounds();
+        //
+        exit(0);
+        break;
     }
     glutPostRedisplay();
 }
@@ -424,10 +543,7 @@ void mouseButton(int button, int state, int x, int y) {
             glutAttachMenu(GLUT_RIGHT_BUTTON);
         }
         else {
-            // ensure plain right-click does NOT open the menu
-#ifdef FREEGLUT
             glutDetachMenu(GLUT_RIGHT_BUTTON);
-#endif
         }
     }
 
@@ -468,11 +584,9 @@ void mouseMotion(int x, int y) {
 
 // When the popup menu closes, detach so Shift remains required
 void onMenuStatus(int status, int, int) {
-#ifdef FREEGLUT
     if (status == GLUT_MENU_NOT_IN_USE) {
         glutDetachMenu(GLUT_RIGHT_BUTTON);
     }
-#endif
 }
 
 // ===== Fullscreen, Menu, Reset =====
@@ -489,17 +603,33 @@ void resetGame() {
     missionMsg.clear();
     startTime = (int)time(NULL);
     arcballTheta = 0.0f; arcballPhi = 45.0f; arcballRadius = 20.0f;
+    //
+    //////////// BONUS
+    //
+    for (int i = 0; i < ROBOT_COUNT; ++i) {
+        robotDirs[i] = randDir2D();
+        robotJumpPhase[i] = frand(0.0f, 100.0f);
+        robotYOffset[i] = 0.0f;
+    }
+    PlayBGMStart();
+    //
     updateArcballCamera();
     glutPostRedisplay();
 }
 
 void menuHandler(int option) {
     if (option == 0) resetGame();
-    else if (option == 1) exit(0);
+    //
+    //////////// BONUS
+    //
+    else if (option == 1) { StopAllSounds(); exit(0); }
+    //
 }
 
 // ===== Main =====
 int main(int argc, char** argv) {
+    srand((unsigned int)time(NULL));
+
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE);
     glutInitWindowSize(WIN_W, WIN_H);
@@ -508,7 +638,21 @@ int main(int argc, char** argv) {
     initRobots();
     robotHitTimers.resize(ROBOT_COUNT, 0.0f);
     robotAlive.resize(ROBOT_COUNT, true);
-    robotRadii.resize(ROBOT_COUNT, 1.0f);
+    robotRadi.resize(ROBOT_COUNT, 1.0f);
+
+    //
+    //////////// BONUS
+    //
+    robotDirs.resize(ROBOT_COUNT);
+    robotJumpPhase.resize(ROBOT_COUNT, 0.0f);
+    robotYOffset.resize(ROBOT_COUNT, 0.0f);
+    for (int i = 0; i < ROBOT_COUNT; ++i) {
+        robotDirs[i] = randDir2D();
+        robotJumpPhase[i] = frand(0.0f, 100.0f);
+        robotYOffset[i] = 0.0f;
+    }
+    //
+
     startTime = (int)time(NULL);
 
     glEnable(GL_DEPTH_TEST);
@@ -530,6 +674,13 @@ int main(int argc, char** argv) {
 
     updateArcballCamera();
     printInstructions(); // print to terminal
+
+    //
+    //////////// BONUS
+    //
+    PlayBGMStart();
+    //
+
     glutMainLoop();
     return 0;
 }
