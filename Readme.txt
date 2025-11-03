@@ -5,40 +5,42 @@ Keep a files in same folder and run .exe file to execute program, use the .sln f
 
 Controls for program:
 
-================= Robot Controls =================
+================= Assignment 3: Robot Hunter =================
 Keyboard Controls:
-  p : Display vertex-only model of robots
-  w : Display wireframe model of robots
-  s : Display solid model of robots (default)
-  c : Toggle screen clearing (black background only)
-  a : Toggle axes display (X=Red, Y=Green, Z=Blue)
-  d : Toggle dancing animation on/off
-  i : Toggle between group dancing and individual dancing
-  f : Toggle confetti particle system (only works while dancing)
-  q : Quit the program
+  w : Wireframe mode
+  s : Solid mode
+  c : Toggle colliders on/off
+  a : Toggle axes display
+  b : Toggle bullet speed (slow, fast, very fast)
+  m : Toggle enemy robot motion (dance)
+  Space : Fire bullet
+  F1 : Toggle fullscreen
+  F2 : Toggle between FPV and ESV views
+  ESC : Exit program
 
-Camera Controls (Arrow Keys):
-  UP    : Move camera forward
-  DOWN  : Move camera backward
-  LEFT  : Rotate camera left
-  RIGHT : Rotate camera right
+Camera Controls:
+  Arrow Keys : Move / rotate FPV camera
+  Arcball (ESV only):
+    Left-drag  : Rotate camera
+    Right-drag : Zoom in/out
 
-Camera Views (Function Keys):
-  F1 : Toggle rear view camera (top-left viewport)
-  F2 : Toggle birds-eye camera (top-right viewport)
-  F3 : Switch main display between First Person and BirdÆs Eye view
+Mouse Controls:
+  Shift + Right-Click : Open popup menu (Resume / Exit)
 
-==================================================
+Game Info:
+  Score +10 for a hit, -2 for a miss
+  Eliminate all robots within 30 seconds to complete the mission.
+================================================================
 
 
 BONUS:
-Added a confetti particle system. Creates particles with pos and veloctiy above robots, which spreads and falls, once hitting y = -1, resets to a new posistion and repeats
-Can be toggled while dancing with 'f', set max of 100 particles at a time
+- winmm sound: looping BGM, shoot and hit SFX
+- Simple AI: random walking, randomly changes directions, bounces off of borders
 
 all sections that have bonus related code are marked with
 
 //
 //////////// BONUS
 //
-	(content)
+    (content)
 //

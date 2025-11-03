@@ -7,12 +7,12 @@
       "RelativeMoniker": "D:0:0:{7F2198AB-BF4E-4171-9803-CE4481673571}|CG - Assignment 1.vcxproj|solutionrelative:main.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{7F2198AB-BF4E-4171-9803-CE4481673571}|CG - Assignment 1.vcxproj|C:\\Users\\traut\\source\\repos\\Computer-Graphics-Assignments\\helper.hpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
-      "RelativeMoniker": "D:0:0:{7F2198AB-BF4E-4171-9803-CE4481673571}|CG - Assignment 1.vcxproj|solutionrelative:helper.hpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{7F2198AB-BF4E-4171-9803-CE4481673571}|CG - Assignment 1.vcxproj|C:\\Users\\traut\\source\\repos\\Computer-Graphics-Assignments\\helper.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{7F2198AB-BF4E-4171-9803-CE4481673571}|CG - Assignment 1.vcxproj|solutionrelative:helper.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7F2198AB-BF4E-4171-9803-CE4481673571}|CG - Assignment 1.vcxproj|C:\\Users\\traut\\source\\repos\\Computer-Graphics-Assignments\\helper.hpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{7F2198AB-BF4E-4171-9803-CE4481673571}|CG - Assignment 1.vcxproj|solutionrelative:helper.hpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     }
   ],
   "DocumentGroupContainers": [
@@ -32,33 +32,32 @@
               "RelativeDocumentMoniker": "main.cpp",
               "ToolTip": "C:\\Users\\traut\\source\\repos\\Computer-Graphics-Assignments\\main.cpp",
               "RelativeToolTip": "main.cpp",
-              "ViewState": "AgIAAFQAAAAAAAAAAAAAAHAAAAAhAAAAAAAAAA==",
+              "ViewState": "AgIAAF4CAAAAAAAAAAAAAA4AAAACAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
               "WhenOpened": "2025-11-03T00:17:45.894Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 2,
               "Title": "helper.hpp",
               "DocumentMoniker": "C:\\Users\\traut\\source\\repos\\Computer-Graphics-Assignments\\helper.hpp",
               "RelativeDocumentMoniker": "helper.hpp",
               "ToolTip": "C:\\Users\\traut\\source\\repos\\Computer-Graphics-Assignments\\helper.hpp",
               "RelativeToolTip": "helper.hpp",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABQAAAACAAAAAAAAAA==",
+              "ViewState": "AgIAABIAAAAAAAAAAAAiwFsAAABUAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
-              "WhenOpened": "2025-11-03T00:17:47.718Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-11-03T00:17:47.718Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 1,
               "Title": "helper.cpp",
               "DocumentMoniker": "C:\\Users\\traut\\source\\repos\\Computer-Graphics-Assignments\\helper.cpp",
               "RelativeDocumentMoniker": "helper.cpp",
               "ToolTip": "C:\\Users\\traut\\source\\repos\\Computer-Graphics-Assignments\\helper.cpp",
               "RelativeToolTip": "helper.cpp",
-              "ViewState": "AgIAAJ8AAAAAAAAAAAAiwK8AAAABAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAEoAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
               "WhenOpened": "2025-11-03T00:17:46.766Z",
               "EditorCaption": ""

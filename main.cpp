@@ -5,8 +5,8 @@ Animation and Game Design - Assignment 3 - Robot Hunter
 Removed some un-needed features from previous assignment
 
 BONUS:
-- winmm sound: looping BGM, shoot and hit SFX (with BGM resume)
-- Simple AI: random walking; 'm' toggles jumping to disrupt aiming
+- winmm sound: looping BGM, shoot and hit SFX
+- Simple AI: random walking
 
 all sections that have bonus related code are marked with
 
@@ -17,22 +17,11 @@ all sections that have bonus related code are marked with
 //
 */
 
-/*
-Andrew Trautzsch - 811198871
-Animation and Game Design - Assignment 2 - Moving Cameras and Humanoid Robots
-
-
-BONUS:
-Added a confetti particle system. Creates particles with pos and veloctiy above robots, which spreads and falls, once hitting y = -1, resets to a new posistion and repeats
-Can be toggled while dancing with 'f', set max of 100 particles at a time
-*/
-
 #include "helper.hpp"
 
 // ===== Window Globals =====
 int WIN_W = 800;
 int WIN_H = 600;
-int ROBOT_COUNT = 10;
 
 #define PI 3.14159265f
 
@@ -67,6 +56,7 @@ Vector3 legColor = getColor(RED);
 
 // ===== Robot Data =====
 // using std::vector for easier implementation;
+int ROBOT_COUNT = 10;
 std::vector<float>   robotSpeeds;     
 std::vector<float>   robotOffsets;
 std::vector<int>     robotTypes;
@@ -108,26 +98,20 @@ static Vector3 randDir2D() {
     return Vector3(x / len, 0, z / len);
 }
 
-const TCHAR* SOUND_BGM = TEXT("./bgm.wav");
-const TCHAR* SOUND_SHOOT = TEXT("./shoot.wav");
-const TCHAR* SOUND_HIT = TEXT("./hit.wav");
-
 // Forward for BGM resume timer
 void bgmResumeTimer(int);
 
 // Sound helpers
 void PlayBGMStart() {
-    // Loop BGM; SND_FILENAME so it loads file, not alias
-    PlaySound(SOUND_BGM, NULL, SND_ASYNC | SND_LOOP | SND_FILENAME);
+    PlaySound(TEXT("bgm.wav"), NULL, SND_ASYNC | SND_LOOP | SND_FILENAME);
 }
 void PlayShoot() {
-    // One-shot; then resume BGM shortly after to avoid silence
-    PlaySound(SOUND_SHOOT, NULL, SND_ASYNC | SND_FILENAME);
-    glutTimerFunc(220, bgmResumeTimer, 0);
+    PlaySound(TEXT("shoot.wav"), NULL, SND_ASYNC | SND_FILENAME);
+    glutTimerFunc(700, bgmResumeTimer, 0);
 }
 void PlayHit() {
-    PlaySound(SOUND_HIT, NULL, SND_ASYNC | SND_FILENAME);
-    glutTimerFunc(280, bgmResumeTimer, 0);
+    PlaySound(TEXT("hit.wav"), NULL, SND_ASYNC | SND_FILENAME);
+    glutTimerFunc(700, bgmResumeTimer, 0);
 }
 void StopAllSounds() {
     PlaySound(NULL, 0, 0);
