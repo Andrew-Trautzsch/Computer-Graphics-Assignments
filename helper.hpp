@@ -7,8 +7,12 @@ This file consists of global variables, helpful datastructures, and helper funct
 #include <GL/glut.h>
 #include <string>
 #include <iostream>
+#include <windows.h>
 #include <cstdlib>
+#include <mmsystem.h>
 #include <vector>
+#include <cmath>
+#include <ctime>
 
 struct Vector3
 {
@@ -95,7 +99,6 @@ void initRobots();
 
 // Simple bitmap text utility for HUD
 void drawBitmapString(float x, float y, const std::string& text, void* font = GLUT_BITMAP_HELVETICA_18);
-
 
 
 #endif

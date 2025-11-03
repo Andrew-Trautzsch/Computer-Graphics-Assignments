@@ -2,30 +2,32 @@
 Andrew Trautzsch - 811198871
 Animation and Game Design - Assignment 3 - Robot Hunter
 
-Added:
-- Gunfire, Bullet, and Aim
-- Per-robot hit effect and improved camera logic
-- Bounding Sphere Collision Detection, Kill Count, Collider Toggle
-- Restored wireframe/solid toggles
-- Enlarged bright-green head visible from ESV
-- Scoring, Timer, Mission Complete/Fail
-- Fullscreen Toggle (F1)
-- Popup Menu (Shift+Right-Click)
-- Arcball Camera (ESV only): Left-drag rotate, Right-drag zoom
-- Enemy Robot Motion (toggle 'm')
-- Cleaned HUD (no instructions, printed to terminal)
+Removed some un-needed features from previous assignment
 
 BONUS:
 - winmm sound: looping BGM, shoot and hit SFX (with BGM resume)
 - Simple AI: random walking; 'm' toggles jumping to disrupt aiming
+
+all sections that have bonus related code are marked with
+
+//
+//////////// BONUS
+//
+    (content)
+//
+*/
+
+/*
+Andrew Trautzsch - 811198871
+Animation and Game Design - Assignment 2 - Moving Cameras and Humanoid Robots
+
+
+BONUS:
+Added a confetti particle system. Creates particles with pos and veloctiy above robots, which spreads and falls, once hitting y = -1, resets to a new posistion and repeats
+Can be toggled while dancing with 'f', set max of 100 particles at a time
 */
 
 #include "helper.hpp"
-#include <cmath>
-#include <ctime>
-#include <windows.h>
-#include <mmsystem.h>
-#pragma comment(lib, "winmm.lib")
 
 // ===== Window Globals =====
 int WIN_W = 800;
@@ -64,13 +66,14 @@ Vector3 armColor = getColor(GREEN);
 Vector3 legColor = getColor(RED);
 
 // ===== Robot Data =====
-std::vector<float>   robotSpeeds;     // reused: base speed (also in old local swing)
+// using std::vector for easier implementation;
+std::vector<float>   robotSpeeds;     
 std::vector<float>   robotOffsets;
 std::vector<int>     robotTypes;
 std::vector<Vector3> robotPositions;
 std::vector<bool>    robotAlive;
-std::vector<float>   robotJumpPhase;  // phase accumulator for jumping
-std::vector<float>   robotYOffset;    // current vertical offset from jump
+std::vector<float>   robotJumpPhase;
+std::vector<float>   robotYOffset;  
 
 // ===== Bounding Spheres =====
 std::vector<float> robotRadi;
@@ -105,9 +108,9 @@ static Vector3 randDir2D() {
     return Vector3(x / len, 0, z / len);
 }
 
-const TCHAR* SOUND_BGM = TEXT("bgm.wav");
-const TCHAR* SOUND_SHOOT = TEXT("shoot.wav");
-const TCHAR* SOUND_HIT = TEXT("hit.wav");
+const TCHAR* SOUND_BGM = TEXT("./bgm.wav");
+const TCHAR* SOUND_SHOOT = TEXT("./shoot.wav");
+const TCHAR* SOUND_HIT = TEXT("./hit.wav");
 
 // Forward for BGM resume timer
 void bgmResumeTimer(int);
@@ -234,7 +237,6 @@ void updateBullets() {
             float combined = bulletRadius + robotRadi[i];
 
             if (dist < combined) {
-                robotHitTimers[i] = 1.0f;
                 robotAlive[i] = false;
                 b.active = false;
                 b.hit = true;
@@ -340,19 +342,15 @@ void drawRobot(float localAngle, int type, int i) {
     if (type == 0) { leftArmXrot = swing; rightArmXrot = -swing; }
     else { leftLegXrot = kick; rightLegXrot = -kick; }
 
-    Vector3 bodyCol = torsoColor;
-    Vector3 legCol = legColor;
-    if (robotHitTimers[i] > 0.0f) { bodyCol = Vector3(1, 0, 0); legCol = Vector3(1, 0, 0); }
-
     glPushMatrix();
     glTranslatef(0.0f, robotYOffset[i], 0.0f);
 
-    createObject(CUBE, Vector3(0, torsoBounceLocal, 0), Vector3(0, 0, 0), Vector3(0.8f, 1.0f, 0.4f), bodyCol);
+    createObject(CUBE, Vector3(0, torsoBounceLocal, 0), Vector3(0, 0, 0), Vector3(0.8f, 1.0f, 0.4f), torsoColor);
     createObject(CUBE, Vector3(0, 0.8f, 0), Vector3(0, 0, 0), Vector3(0.6f, 0.6f, 0.6f), headColor);
     createObject(CUBE, Vector3(-0.55f, 0, 0), Vector3(leftArmXrot, 0, 0), Vector3(0.3f, 1.0f, 0.3f), armColor);
     createObject(CUBE, Vector3(0.55f, 0, 0), Vector3(-leftArmXrot, 0, 0), Vector3(0.3f, 1.0f, 0.3f), armColor);
-    createObject(CUBE, Vector3(-0.2f, -1.0f, 0), Vector3(leftLegXrot, 0, 0), Vector3(0.3f, 1.0f, 0.3f), legCol);
-    createObject(CUBE, Vector3(0.2f, -1.0f, 0), Vector3(rightLegXrot, 0, 0), Vector3(0.3f, 1.0f, 0.3f), legCol);
+    createObject(CUBE, Vector3(-0.2f, -1.0f, 0), Vector3(leftLegXrot, 0, 0), Vector3(0.3f, 1.0f, 0.3f), legColor);
+    createObject(CUBE, Vector3(0.2f, -1.0f, 0), Vector3(rightLegXrot, 0, 0), Vector3(0.3f, 1.0f, 0.3f), legColor);
     glPopMatrix();
 }
 
@@ -597,7 +595,6 @@ void toggleFullscreen() {
 
 void resetGame() {
     killCount = 0; score = 0; bullets.clear();
-    robotHitTimers.assign(ROBOT_COUNT, 0.0f);
     robotAlive.assign(ROBOT_COUNT, true);
     gameOver = false;
     missionMsg.clear();
@@ -633,10 +630,9 @@ int main(int argc, char** argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE);
     glutInitWindowSize(WIN_W, WIN_H);
-    glutCreateWindow("Robot Hunter - Final");
+    glutCreateWindow("Andrew Trautzsch - 811198871");
 
     initRobots();
-    robotHitTimers.resize(ROBOT_COUNT, 0.0f);
     robotAlive.resize(ROBOT_COUNT, true);
     robotRadi.resize(ROBOT_COUNT, 1.0f);
 
