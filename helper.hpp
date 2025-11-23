@@ -13,6 +13,7 @@ This file consists of global variables, helpful datastructures, and helper funct
 #include <vector>
 #include <cmath>
 #include <ctime>
+#include <stb_image.h>
 
 struct Vector3
 {
@@ -88,8 +89,11 @@ void printInstructions();
 // Animation timer
 void danceTimer(int value);
 
-// Primitive builder
+// Primitive builder (legacy cubes/spheres for non-textured things)
 void createObject(Shape type, Vector3 position, Vector3 rotation, Vector3 scale, Vector3 color);
+
+// Textured cube builder (used by robots)
+void drawTexturedCube(GLuint tex);
 
 // Viewport clearing utility
 void clearViewportArea(int x, int y, int w, int h);
@@ -99,6 +103,5 @@ void initRobots();
 
 // Simple bitmap text utility for HUD
 void drawBitmapString(float x, float y, const std::string& text, void* font = GLUT_BITMAP_HELVETICA_18);
-
 
 #endif

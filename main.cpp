@@ -1,6 +1,6 @@
 /*
 Andrew Trautzsch - 811198871
-Animation and Game Design - Assignment 3 - Robot Hunter
+Animation and Game Design - Assignment 3/4 - Robot Hunter
 
 Removed some un-needed features from previous assignment
 
@@ -8,16 +8,48 @@ BONUS:
 - winmm sound: looping BGM, shoot and hit SFX
 - Simple AI: random walking
 
-all sections that have bonus related code are marked with
+All sections that have bonus related code are marked with
 
 //
 //////////// BONUS
 //
     (content)
-//
 */
 
 #include "helper.hpp"
+
+// ===== Texture Loading (stb_image) =====
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+GLuint loadTexture(const char* filename)
+{
+    int width, height, channels;
+    unsigned char* data = stbi_load(filename, &width, &height, &channels, 0);
+    if (!data) {
+        std::cout << "[ERROR] Failed to load: " << filename << "\n";
+        std::cout << "reason: " << stbi_failure_reason() << "\n";
+    }
+
+    GLenum format = (channels == 3) ? GL_RGB : GL_RGBA;
+
+    GLuint texID;
+    glGenTextures(1, &texID);
+    glBindTexture(GL_TEXTURE_2D, texID);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glTexImage2D(GL_TEXTURE_2D,
+        0, format,
+        width, height,
+        0, format,
+        GL_UNSIGNED_BYTE,
+        data);
+
+    stbi_image_free(data);
+    return texID;
+}
 
 // ===== Window Globals =====
 int WIN_W = 800;
@@ -57,13 +89,13 @@ Vector3 legColor = getColor(RED);
 // ===== Robot Data =====
 // using std::vector for easier implementation;
 int ROBOT_COUNT = 10;
-std::vector<float>   robotSpeeds;     
+std::vector<float>   robotSpeeds;
 std::vector<float>   robotOffsets;
 std::vector<int>     robotTypes;
 std::vector<Vector3> robotPositions;
 std::vector<bool>    robotAlive;
 std::vector<float>   robotJumpPhase;
-std::vector<float>   robotYOffset;  
+std::vector<float>   robotYOffset;
 
 // ===== Bounding Spheres =====
 std::vector<float> robotRadi;
@@ -83,7 +115,7 @@ float bulletSpeeds[3] = { 0.05f, 0.15f, 0.3f };
 std::string bulletLabels[3] = { "slow", "fast", "very fast" };
 
 //
-//////////// BONUS
+////////////// BONUS
 //
 std::vector<Vector3> robotDirs;
 
@@ -122,6 +154,13 @@ void bgmResumeTimer(int) {
 }
 //
 
+// ===== Texture Globals =====
+GLuint torsoTex = 0;
+GLuint headTex = 0;
+GLuint armTex = 0;
+GLuint legTex = 0;
+GLuint groundTex = 0;
+
 // ===== Function Prototypes =====
 void updateArcballCamera();
 void toggleFullscreen();
@@ -139,13 +178,19 @@ void drawAxes() {
 }
 
 void drawGroundPlane() {
-    glColor3f(0.3f, 0.3f, 0.3f);
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, groundTex);
+    glColor3f(1.0f, 1.0f, 1.0f);
+
     glBegin(GL_QUADS);
-    glVertex3f(-100, -1.5f, -100);
-    glVertex3f(-100, -1.5f, 100);
-    glVertex3f(100, -1.5f, 100);
-    glVertex3f(100, -1.5f, -100);
+    // Tile the ground for nicer detail
+    glTexCoord2f(0.0f, 0.0f);  glVertex3f(-100.0f, -1.5f, -100.0f);
+    glTexCoord2f(8.0f, 0.0f);  glVertex3f(100.0f, -1.5f, -100.0f);
+    glTexCoord2f(8.0f, 8.0f);  glVertex3f(100.0f, -1.5f, 100.0f);
+    glTexCoord2f(0.0f, 8.0f);  glVertex3f(-100.0f, -1.5f, 100.0f);
     glEnd();
+
+    glDisable(GL_TEXTURE_2D);
 }
 
 // ===== Robots =====
@@ -329,12 +374,52 @@ void drawRobot(float localAngle, int type, int i) {
     glPushMatrix();
     glTranslatef(0.0f, robotYOffset[i], 0.0f);
 
-    createObject(CUBE, Vector3(0, torsoBounceLocal, 0), Vector3(0, 0, 0), Vector3(0.8f, 1.0f, 0.4f), torsoColor);
-    createObject(CUBE, Vector3(0, 0.8f, 0), Vector3(0, 0, 0), Vector3(0.6f, 0.6f, 0.6f), headColor);
-    createObject(CUBE, Vector3(-0.55f, 0, 0), Vector3(leftArmXrot, 0, 0), Vector3(0.3f, 1.0f, 0.3f), armColor);
-    createObject(CUBE, Vector3(0.55f, 0, 0), Vector3(-leftArmXrot, 0, 0), Vector3(0.3f, 1.0f, 0.3f), armColor);
-    createObject(CUBE, Vector3(-0.2f, -1.0f, 0), Vector3(leftLegXrot, 0, 0), Vector3(0.3f, 1.0f, 0.3f), legColor);
-    createObject(CUBE, Vector3(0.2f, -1.0f, 0), Vector3(rightLegXrot, 0, 0), Vector3(0.3f, 1.0f, 0.3f), legColor);
+    // === TORSO (textured) ===
+    glPushMatrix();
+    glTranslatef(0.0f, torsoBounceLocal, 0.0f);
+    glScalef(0.8f, 1.0f, 0.4f);
+    drawTexturedCube(torsoTex);
+    glPopMatrix();
+
+    // === HEAD (textured) ===
+    glPushMatrix();
+    glTranslatef(0.0f, torsoBounceLocal + 0.8f, 0.0f);
+    glScalef(0.6f, 0.6f, 0.6f);
+    drawTexturedCube(headTex);
+    glPopMatrix();
+
+    // === LEFT ARM (textured) ===
+    glPushMatrix();
+    glTranslatef(-0.55f, torsoBounceLocal + 0.0f, 0.0f);
+    glRotatef(leftArmXrot, 1, 0, 0);
+    glScalef(0.3f, 1.0f, 0.3f);
+    drawTexturedCube(armTex);
+    glPopMatrix();
+
+    // === RIGHT ARM (textured) ===
+    glPushMatrix();
+    glTranslatef(0.55f, torsoBounceLocal + 0.0f, 0.0f);
+    glRotatef(-leftArmXrot, 1, 0, 0);
+    glScalef(0.3f, 1.0f, 0.3f);
+    drawTexturedCube(armTex);
+    glPopMatrix();
+
+    // === LEFT LEG (textured) ===
+    glPushMatrix();
+    glTranslatef(-0.2f, torsoBounceLocal - 1.0f, 0.0f);
+    glRotatef(leftLegXrot, 1, 0, 0);
+    glScalef(0.3f, 1.0f, 0.3f);
+    drawTexturedCube(legTex);
+    glPopMatrix();
+
+    // === RIGHT LEG (textured) ===
+    glPushMatrix();
+    glTranslatef(0.2f, torsoBounceLocal - 1.0f, 0.0f);
+    glRotatef(rightLegXrot, 1, 0, 0);
+    glScalef(0.3f, 1.0f, 0.3f);
+    drawTexturedCube(legTex);
+    glPopMatrix();
+
     glPopMatrix();
 }
 
@@ -450,7 +535,7 @@ void keyboardInput(unsigned char key, int, int) {
     if (gameOver) return;
 
     switch (key) {
-    case 'w': state = WIRE; glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); break;
+    case 'w': state = WIRE;  glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); break;
     case 's': state = SOLID; glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); break;
     case 'c': showColliders = !showColliders; break;
     case 'a': axies = !axies; break;
@@ -483,11 +568,8 @@ void keyboardInput(unsigned char key, int, int) {
     } break;
 
     case 27:
-        //
-        //////////// BONUS
-        //
+        // ESC: popup menu behavior stays (menu attached via mouse/Shift)
         StopAllSounds();
-        //
         exit(0);
         break;
     }
@@ -517,9 +599,9 @@ void specialKeys(int key, int, int) {
 }
 
 // ===== Mouse =====
-void mouseButton(int button, int state, int x, int y) {
+void mouseButton(int button, int stateM, int x, int y) {
     // Shift + Right-Click -> Popup menu
-    if (button == GLUT_RIGHT_BUTTON && state == GLUT_DOWN) {
+    if (button == GLUT_RIGHT_BUTTON && stateM == GLUT_DOWN) {
         int mods = glutGetModifiers();
         if (mods & GLUT_ACTIVE_SHIFT) {
             glutAttachMenu(GLUT_RIGHT_BUTTON);
@@ -533,11 +615,11 @@ void mouseButton(int button, int state, int x, int y) {
     if (!mainIsESV) return;
 
     if (button == GLUT_LEFT_BUTTON) {
-        if (state == GLUT_DOWN) { leftDragging = true; lastMouseX = x; lastMouseY = y; }
+        if (stateM == GLUT_DOWN) { leftDragging = true; lastMouseX = x; lastMouseY = y; }
         else leftDragging = false;
     }
     else if (button == GLUT_RIGHT_BUTTON) {
-        if (state == GLUT_DOWN) { rightDragging = true; lastMouseX = x; lastMouseY = y; }
+        if (stateM == GLUT_DOWN) { rightDragging = true; lastMouseX = x; lastMouseY = y; }
         else rightDragging = false;
     }
 }
@@ -600,11 +682,7 @@ void resetGame() {
 
 void menuHandler(int option) {
     if (option == 0) resetGame();
-    //
-    //////////// BONUS
-    //
     else if (option == 1) { StopAllSounds(); exit(0); }
-    //
 }
 
 // ===== Main =====
@@ -616,6 +694,7 @@ int main(int argc, char** argv) {
     glutInitWindowSize(WIN_W, WIN_H);
     glutCreateWindow("Andrew Trautzsch - 811198871");
 
+    // Initialize robots
     initRobots();
     robotAlive.resize(ROBOT_COUNT, true);
     robotRadi.resize(ROBOT_COUNT, 1.0f);
@@ -638,6 +717,22 @@ int main(int argc, char** argv) {
     glEnable(GL_DEPTH_TEST);
     glClearColor(0, 0, 0, 1);
 
+    // Load textures (make sure these files exist)
+    torsoTex = loadTexture("textures/torso.png");
+    std::cout << "TorsoTex ID = " << torsoTex << "\n";
+
+    headTex = loadTexture("textures/head.png");
+    std::cout << "HeadTex ID = " << headTex << "\n";
+
+    armTex = loadTexture("textures/arm.png");
+    std::cout << "ArmTex ID = " << armTex << "\n";
+
+    legTex = loadTexture("textures/leg.png");
+    std::cout << "LegTex ID = " << legTex << "\n";
+
+    groundTex = loadTexture("textures/ground.png");
+    std::cout << "GroundTex ID = " << groundTex << "\n";
+
     glutDisplayFunc(MyDisplay);
     glutIdleFunc(MyDisplay);
     glutKeyboardFunc(keyboardInput);
@@ -648,7 +743,7 @@ int main(int argc, char** argv) {
 
     // Build popup menu (detached by default; Shift+Right attaches temporarily)
     glutCreateMenu(menuHandler);
-    glutAddMenuEntry("RESUME", 0);
+    glutAddMenuEntry("NEW GAME", 0);
     glutAddMenuEntry("EXIT", 1);
     glutMenuStatusFunc(onMenuStatus); // re-detach after use (FreeGLUT)
 

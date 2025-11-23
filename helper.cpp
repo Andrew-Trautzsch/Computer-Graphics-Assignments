@@ -44,18 +44,18 @@ void drawBitmapString(float x, float y, const std::string& text, void* font) {
 
 // instructions on using program
 void printInstructions() {
-    std::cout << "================= Assignment 3: Robot Hunter =================\n";
+    std::cout << "================= Assignment 3/4: Robot Hunter =================\n";
     std::cout << "Keyboard Controls:\n";
     std::cout << "  w : Wireframe mode\n";
     std::cout << "  s : Solid mode\n";
     std::cout << "  c : Toggle colliders on/off\n";
     std::cout << "  a : Toggle axes display\n";
     std::cout << "  b : Toggle bullet speed (slow, fast, very fast)\n";
-    std::cout << "  m : Toggle enemy robot motion (dance)\n";
+    std::cout << "  m : Toggle enemy robot motion (dance / walk)\n";
     std::cout << "  Space : Fire bullet\n";
     std::cout << "  F1 : Toggle fullscreen\n";
     std::cout << "  F2 : Toggle between FPV and ESV views\n";
-    std::cout << "  ESC : Exit program\n\n";
+    std::cout << "  ESC : Popup menu (NEW GAME / RESUME / EXIT)\n\n";
 
     std::cout << "Camera Controls:\n";
     std::cout << "  Arrow Keys : Move / rotate FPV camera\n";
@@ -64,7 +64,7 @@ void printInstructions() {
     std::cout << "    Right-drag : Zoom in/out\n\n";
 
     std::cout << "Mouse Controls:\n";
-    std::cout << "  Shift + Right-Click : Open popup menu (Resume / Exit)\n\n";
+    std::cout << "  Shift + Right-Click : Open popup menu (NEW GAME / RESUME / EXIT)\n\n";
 
     std::cout << "Game Info:\n";
     std::cout << "  Score +10 for a hit, -2 for a miss\n";
@@ -139,6 +139,53 @@ void createObject(Shape type, Vector3 position, Vector3 rotation, Vector3 scale,
     }
 
     glPopMatrix(); // end object creation
+}
+
+// NEW: Textured cube used for robot parts
+void drawTexturedCube(GLuint tex)
+{
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, tex);
+
+    glBegin(GL_QUADS);
+    // FRONT
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(-0.5f, -0.5f, 0.5f);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f(0.5f, -0.5f, 0.5f);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f(0.5f, 0.5f, 0.5f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-0.5f, 0.5f, 0.5f);
+
+    // BACK
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(0.5f, -0.5f, -0.5f);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f(-0.5f, -0.5f, -0.5f);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f(-0.5f, 0.5f, -0.5f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(0.5f, 0.5f, -0.5f);
+
+    // LEFT
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(-0.5f, -0.5f, -0.5f);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f(-0.5f, -0.5f, 0.5f);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f(-0.5f, 0.5f, 0.5f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-0.5f, 0.5f, -0.5f);
+
+    // RIGHT
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(0.5f, -0.5f, 0.5f);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f(0.5f, -0.5f, -0.5f);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f(0.5f, 0.5f, -0.5f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(0.5f, 0.5f, 0.5f);
+
+    // TOP
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(-0.5f, 0.5f, 0.5f);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f(0.5f, 0.5f, 0.5f);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f(0.5f, 0.5f, -0.5f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-0.5f, 0.5f, -0.5f);
+
+    // BOTTOM
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(-0.5f, -0.5f, -0.5f);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f(0.5f, -0.5f, -0.5f);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f(0.5f, -0.5f, 0.5f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-0.5f, -0.5f, 0.5f);
+
+    glEnd();
+    glDisable(GL_TEXTURE_2D);
 }
 
 // Used to prevent overlap of primary camera and corner cameras
