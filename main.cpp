@@ -1,19 +1,6 @@
 /*
 Andrew Trautzsch - 811198871
-Animation and Game Design - Assignment 3/4 - Robot Hunter
-
-Removed some un-needed features from previous assignment
-
-BONUS:
-- winmm sound: looping BGM, shoot and hit SFX
-- Simple AI: random walking
-
-All sections that have bonus related code are marked with
-
-//
-//////////// BONUS
-//
-    (content)
+Animation and Game Design - Assignment 4 - Robot Hunter
 */
 
 #include "helper.hpp"
@@ -63,7 +50,7 @@ Camera camESV = { 0.0f, 20.0f, 0.01f, 0.0f, 0.0f, 0.0f };
 bool mainIsESV = false;
 float cameraMS = 0.1f;
 int lightingMode = 0;
-int shadingMode = 1;  // 0 = flat, 1 = smooth (default)
+int shadingMode = 1;
 
 // ===== Arcball (ESV) =====
 float arcballTheta = 0.0f;
@@ -73,9 +60,9 @@ int lastMouseX = 0, lastMouseY = 0;
 bool leftDragging = false, rightDragging = false;
 
 // ===== Game State =====
-bool dancing = false;           // NOW means "jumping" mode for disruption
-bool groupDance = true;         // kept for local leg/arm swing calc
-int  danceAngle = 0;            // also used for subtle limb swing
+bool dancing = false;           
+bool groupDance = true;         
+int  danceAngle = 0;            
 float torsoBounce = 0.05f * sinf(danceAngle * PI / 180.0f);
 
 bool axies = false;
@@ -89,7 +76,6 @@ Vector3 armColor = getColor(GREEN);
 Vector3 legColor = getColor(RED);
 
 // ===== Robot Data =====
-// using std::vector for easier implementation;
 int ROBOT_COUNT = 10;
 std::vector<float>   robotSpeeds;
 std::vector<float>   robotOffsets;
@@ -116,9 +102,6 @@ int   bulletMode = 0;
 float bulletSpeeds[3] = { 0.05f, 0.15f, 0.3f };
 std::string bulletLabels[3] = { "slow", "fast", "very fast" };
 
-//
-////////////// BONUS
-//
 std::vector<Vector3> robotDirs;
 
 static float frand(float a, float b) {
@@ -132,29 +115,33 @@ static Vector3 randDir2D() {
     return Vector3(x / len, 0, z / len);
 }
 
-// Forward for BGM resume timer
-void bgmResumeTimer(int);
+bool soundEnabled = true;
 
-// Sound helpers
+// Forward for BGM resume timer
 void PlayBGMStart() {
+    if (!soundEnabled) return;
     PlaySound(TEXT("bgm.wav"), NULL, SND_ASYNC | SND_LOOP | SND_FILENAME);
 }
+
+void bgmResumeTimer(int) {
+    if (!gameOver && soundEnabled) PlayBGMStart();
+}
+
 void PlayShoot() {
+    if (!soundEnabled) return;
     PlaySound(TEXT("shoot.wav"), NULL, SND_ASYNC | SND_FILENAME);
     glutTimerFunc(700, bgmResumeTimer, 0);
 }
+
 void PlayHit() {
+    if (!soundEnabled) return;
     PlaySound(TEXT("hit.wav"), NULL, SND_ASYNC | SND_FILENAME);
     glutTimerFunc(700, bgmResumeTimer, 0);
 }
+
 void StopAllSounds() {
     PlaySound(NULL, 0, 0);
 }
-void bgmResumeTimer(int) {
-    // If game not over, keep BGM going
-    if (!gameOver) PlayBGMStart();
-}
-//
 
 // ===== Texture Globals =====
 GLuint torsoTex = 0;
@@ -162,10 +149,11 @@ GLuint headTex = 0;
 GLuint armTex = 0;
 GLuint legTex = 0;
 GLuint groundTex = 0;
+GLuint skyTex = 0;
 
 // ===== Popup Menu State (ESC) =====
-bool showMenu = false;          // true when ESC menu is open
-int  menuSelection = 0;         // 0 = NEW GAME, 1 = RESUME, 2 = EXIT
+bool showMenu = false;          
+int  menuSelection = 0;         
 
 struct MenuButton {
     float x, y, w, h;
@@ -180,6 +168,101 @@ void resetGame();
 void menuHandler(int option);
 void onMenuStatus(int status, int x, int y);
 void setupLighting();
+void handleMenuSelection(int option);
+
+void drawMenuOverlay() {
+    // Use full window for the overlay
+    glViewport(0, 0, WIN_W, WIN_H);
+
+    // Setup 2D orthographic projection
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    gluOrtho2D(0.0, WIN_W, 0.0, WIN_H);
+
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Dark translucent background
+    glColor4f(0.0f, 0.0f, 0.0f, 0.6f);
+    glBegin(GL_QUADS);
+    glVertex2f(0.0f, 0.0f);
+    glVertex2f((float)WIN_W, 0.0f);
+    glVertex2f((float)WIN_W, (float)WIN_H);
+    glVertex2f(0.0f, (float)WIN_H);
+    glEnd();
+
+    // Menu title
+    glColor3f(1.0f, 1.0f, 1.0f);
+    drawBitmapString(WIN_W * 0.5f - 90.0f, WIN_H * 0.75f,
+        "Robot Hunter - PAUSED",
+        GLUT_BITMAP_HELVETICA_18);
+
+    // Buttons
+    const char* labels[3] = { "NEW GAME", "RESUME", "EXIT" };
+
+    float boxW = 260.0f;
+    float boxH = 40.0f;
+    float centerX = WIN_W * 0.5f;
+    float startY = WIN_H * 0.55f;
+
+    for (int i = 0; i < 3; ++i) {
+        float bx = centerX - boxW * 0.5f;
+        float by = startY - i * (boxH + 15.0f);
+
+        // store clickable regions for the mouse
+        menuButtons[i].x = bx;
+        menuButtons[i].y = by;
+        menuButtons[i].w = boxW;
+        menuButtons[i].h = boxH;
+
+        if (i == menuSelection)
+            glColor3f(0.8f, 0.8f, 0.2f); // highlighted
+        else
+            glColor3f(0.3f, 0.3f, 0.3f); // normal
+
+        glBegin(GL_QUADS);
+        glVertex2f(bx, by);
+        glVertex2f(bx + boxW, by);
+        glVertex2f(bx + boxW, by + boxH);
+        glVertex2f(bx, by + boxH);
+        glEnd();
+
+        glColor3f(1.0f, 1.0f, 1.0f);
+        drawBitmapString(bx + 20.0f, by + boxH * 0.3f,
+            labels[i],
+            GLUT_BITMAP_HELVETICA_18);
+    }
+
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
+
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+}
+
+void handleMenuSelection(int option) {
+    switch (option) {
+    case 0: // NEW GAME
+        showMenu = false;
+        resetGame();
+        break;
+    case 1: // RESUME
+        showMenu = false;
+        break;
+    case 2: // EXIT
+        StopAllSounds();
+        exit(0);
+        break;
+    }
+}
 
 
 // ===== Utility Draws =====
@@ -189,6 +272,60 @@ void drawAxes() {
     glColor3f(0, 1, 0); glVertex3f(0, 0, 0); glVertex3f(0, 10, 0);
     glColor3f(0, 0, 1); glVertex3f(0, 0, 0); glVertex3f(0, 0, 10);
     glEnd();
+}
+
+void drawSkybox(const Camera& cam) {
+    if (skyTex == 0) return;
+
+    glDisable(GL_LIGHTING);
+    glDisable(GL_DEPTH_TEST);
+
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, skyTex);
+    glColor3f(1.0f, 1.0f, 1.0f);
+
+    glPushMatrix();
+    glTranslatef(cam.x, cam.y, cam.z);
+
+    float S = 80.0f; // size of the sky cube
+
+    glBegin(GL_QUADS);
+    // +Z (front)
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(-S, -S, S);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f(S, -S, S);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f(S, S, S);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-S, S, S);
+
+    // -Z (back)
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(S, -S, -S);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f(-S, -S, -S);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f(-S, S, -S);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(S, S, -S);
+
+    // +X (right)
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(S, -S, S);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f(S, -S, -S);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f(S, S, -S);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(S, S, S);
+
+    // -X (left)
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(-S, -S, -S);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f(-S, -S, S);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f(-S, S, S);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-S, S, -S);
+
+    // +Y (top)
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(-S, S, S);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f(S, S, S);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f(S, S, -S);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-S, S, -S);
+    glEnd();
+
+    glPopMatrix();
+
+    glDisable(GL_TEXTURE_2D);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_LIGHTING);
 }
 
 void drawGroundPlane()
@@ -251,6 +388,8 @@ void drawBullets() {
 
 void drawColliders() {
     if (!showColliders) return;
+
+    // Robot colliders (magenta spheres)
     glColor3f(1, 0, 1);
     for (int i = 0; i < ROBOT_COUNT; i++) {
         if (!robotAlive[i]) continue;
@@ -259,7 +398,20 @@ void drawColliders() {
         glutWireSphere(robotRadi[i], 10, 10);
         glPopMatrix();
     }
+
+    // Obstacle colliders (cyan cubes)
+    glColor3f(0, 1, 1);
+    for (auto& o : obstacles) {
+        if (!o.active) continue;
+
+        glPushMatrix();
+        glTranslatef(o.x, o.y + 1.0f, o.z);
+        float size = 2.0f * o.scale;
+        glutWireCube(size * 2.0f);
+        glPopMatrix();
+    }
 }
+
 
 // ===== Bullet & Collision =====
 void updateBullets() {
@@ -307,11 +459,7 @@ void updateBullets() {
                 killCount++;
                 score += 10;
 
-                //
-                //////////// BONUS
-                //
                 PlayHit();
-                //
                 break;
             }
         }
@@ -323,9 +471,6 @@ void updateBullets() {
     }
 }
 
-//
-//////////// BONUS
-//
 void updateRobotMotion() {
     if (gameOver) return;
 
@@ -338,9 +483,9 @@ void updateRobotMotion() {
 
         // Jumping disrupt mode when 'm' is on
         if (dancing) {
-            robotJumpPhase[i] += 0.08f + 0.12f * robotSpeeds[i];   // slower frequency
+            robotJumpPhase[i] += 0.08f + 0.12f * robotSpeeds[i]; // slower frequency
             float s = std::sin(robotJumpPhase[i] * 0.05f);
-            robotYOffset[i] = (s > 0.0f ? s * 2.0f : 0.0f);        // higher amplitude
+            robotYOffset[i] = (s > 0.0f ? s * 2.0f : 0.0f); // higher amplitude
         }
         else {
             robotYOffset[i] = 0.0f;
@@ -381,7 +526,6 @@ void updateRobotMotion() {
 
     danceAngle = (danceAngle + 3) % 360;
 }
-//
 
 // ===== Arcball =====
 void updateArcballCamera() {
@@ -482,35 +626,27 @@ void drawRobotAtIndex(int i) {
 
 void render3DSceneCommon() {
     drawGroundPlane();
+    drawObstacles();
+
     for (int i = 0; i < ROBOT_COUNT; ++i) drawRobotAtIndex(i);
     drawBullets();
     drawColliders();
     if (axies) drawAxes();
-
-    // Add a test sphere to demonstrate shading
-    glPushMatrix();
-    glTranslatef(5.0f, 1.0f, 5.0f); // Position in scene
-    glScalef(2.0f, 2.0f, 2.0f); // Larger for visibility
-    glColor3f(0.7f, 0.7f, 0.7f); // Neutral color
-    glutSolidSphere(0.5, 20, 20); // Higher resolution for smooth shading
-    glPopMatrix();
 }
+
 
 void drawFPVGun() {
     glPushMatrix();
 
-    // Position: lower-right corner, in front of camera
     glTranslatef(camFPV.x + camFPV.lx * 0.7f,
         camFPV.y - 0.65f,
         camFPV.z + camFPV.lz * 0.7f);
 
-    // CORRECT ROTATION (we’ll refine this below as well)
     float yawDegrees = (-camFPV.angle) * (180.0f / PI) + 90.0f;
     glRotatef(yawDegrees, 0.0f, 1.0f, 0.0f);
 
-    // Disable texture so lighting + shading is fully visible
     glDisable(GL_TEXTURE_2D);
-    glColor3f(0.8f, 0.35f, 0.15f);  // Nice brick red
+    glColor3f(0.8f, 0.35f, 0.15f);
 
     // Handle
     glPushMatrix();
@@ -533,7 +669,6 @@ void drawFPVGun() {
     glutSolidCube(1.0f);
     glPopMatrix();
 
-    // SMOOTH CYLINDER — this is what makes F4 toggle super obvious
     glPushMatrix();
     glTranslatef(1.8f, -0.12f, 0.0f);
     glRotatef(90.0f, 0.0f, 1.0f, 0.0f);
@@ -599,9 +734,11 @@ void drawMainViewport() {
     if (mainIsESV) {
         updateArcballCamera();
         lookFromCamera(camESV, WIN_W, mainH);
+        drawSkybox(camESV);
     }
     else {
         lookFromCamera(camFPV, WIN_W, mainH);
+        drawSkybox(camESV);
     }
 
     setupLighting();
@@ -610,12 +747,10 @@ void drawMainViewport() {
     render3DSceneCommon();
 
     if (mainIsFPV) {
-        // FPV main: show crosshair + gun
         drawGunAndAim(false);
         drawFPVGun();
     }
     else {
-        // ESV main: only show player marker
         drawGunAndAim(true);
     }
 
@@ -625,13 +760,15 @@ void drawMainViewport() {
     clearViewportArea(miniX, miniY, miniW, miniH);
     glViewport(miniX, miniY, miniW, miniH);
 
-    bool miniIsFPV = !mainIsFPV; // mini view uses the opposite camera
+    bool miniIsFPV = !mainIsFPV;
 
     if (miniIsFPV) {
         lookFromCamera(camFPV, miniW, miniH);
+        drawSkybox(camESV);
     }
     else {
         lookFromCamera(camESV, miniW, miniH);
+        drawSkybox(camESV);
     }
 
     setupLighting();
@@ -640,12 +777,10 @@ void drawMainViewport() {
     render3DSceneCommon();
 
     if (miniIsFPV) {
-        // FPV mini: show crosshair + gun
         drawGunAndAim(false);
         drawFPVGun();
     }
     else {
-        // ESV mini: player marker
         drawGunAndAim(true);
     }
 }
@@ -655,32 +790,55 @@ void drawMainViewport() {
 // ===== Display =====
 void MyDisplay() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    if (clear) { glutSwapBuffers(); return; }
+    if (clear) {
+        glutSwapBuffers();
+        return;
+    }
 
-    if (!gameOver && (time(NULL) - startTime >= 30)) {
+    // Time limit only counts while not in menu
+    if (!gameOver && !showMenu && (time(NULL) - startTime >= 30)) {
         gameOver = true;
         missionMsg = (killCount == ROBOT_COUNT) ? "Mission Complete!" : "Mission Fail!";
     }
 
-    if (!gameOver) {
-        //
-        //////////// BONUS
-        //
+    // Only update game when NOT paused by menu
+    if (!gameOver && !showMenu) {
         updateRobotMotion();
-        //
         updateBullets();
     }
+
     drawHUDViewport();
     drawMainViewport();
-    drawModel();
-    drawObstacles();
+
+    // Draw ESC menu overlay on top of everything
+    if (showMenu) {
+        drawMenuOverlay();
+    }
+
     glutSwapBuffers();
 }
+
 
 void reshape(int w, int h) { WIN_W = w; WIN_H = (h > 0 ? h : 1); glutPostRedisplay(); }
 
 // ===== Keyboard =====
 void keyboardInput(unsigned char key, int, int) {
+    // ESC always toggles the menu on/off
+    if (key == 27) {   // ESC
+        showMenu = !showMenu;
+        glutPostRedisplay();
+        return;
+    }
+
+    // If menu is open, only handle selection keys here
+    if (showMenu) {
+        if (key == 13 || key == ' ') {  // Enter or Space
+            handleMenuSelection(menuSelection);
+        }
+        return;
+    }
+
+    // After mission end, ignore normal controls
     if (gameOver) return;
 
     switch (key) {
@@ -719,15 +877,10 @@ void keyboardInput(unsigned char key, int, int) {
         b.hit = false;
         bullets.push_back(b);
 
-        //
-        //////////// BONUS
-        //
         PlayShoot();
-        //
     } break;
 
     case 27:
-        // ESC: popup menu behavior stays (menu attached via mouse/Shift)
         StopAllSounds();
         exit(0);
         break;
@@ -737,10 +890,29 @@ void keyboardInput(unsigned char key, int, int) {
 
 // ===== Special Keys =====
 void specialKeys(int key, int, int) {
+    // Menu navigation when ESC overlay is open
+    if (showMenu) {
+        if (key == GLUT_KEY_UP) {
+            // move selection up (wrap around)
+            menuSelection = (menuSelection + 2) % 3; // +2  -1 mod 3
+        }
+        else if (key == GLUT_KEY_DOWN) {
+            // move selection down (wrap around)
+            menuSelection = (menuSelection + 1) % 3;
+        }
+        glutPostRedisplay();
+        return;
+    }
+
     if (gameOver) return;
+
     switch (key) {
-    case GLUT_KEY_LEFT:  camFPV.angle -= 0.05f; break;
-    case GLUT_KEY_RIGHT: camFPV.angle += 0.05f; break;
+    case GLUT_KEY_LEFT:
+        camFPV.angle -= 0.05f;
+        break;
+    case GLUT_KEY_RIGHT:
+        camFPV.angle += 0.05f;
+        break;
     case GLUT_KEY_UP:
         camFPV.x += sinf(camFPV.angle) * cameraMS;
         camFPV.z -= cosf(camFPV.angle) * cameraMS;
@@ -749,9 +921,24 @@ void specialKeys(int key, int, int) {
         camFPV.x -= sinf(camFPV.angle) * cameraMS;
         camFPV.z += cosf(camFPV.angle) * cameraMS;
         break;
-    case GLUT_KEY_F1: toggleFullscreen(); break;
-    case GLUT_KEY_F2: mainIsESV = !mainIsESV; break;
-    case GLUT_KEY_F4: shadingMode = (shadingMode == 0 ? 1 : 0);
+    case GLUT_KEY_F1:
+        toggleFullscreen();
+        break;
+    case GLUT_KEY_F2:
+        mainIsESV = !mainIsESV;
+        break;
+    case GLUT_KEY_F3:
+        soundEnabled = !soundEnabled;
+        if (!soundEnabled) {
+            StopAllSounds();
+        }
+        else if (!gameOver) {
+            PlayBGMStart();
+        }
+        break;
+    case GLUT_KEY_F4:
+        shadingMode = (shadingMode == 0 ? 1 : 0);
+        break;
     }
 
     camFPV.lx = sinf(camFPV.angle);
@@ -759,17 +946,24 @@ void specialKeys(int key, int, int) {
     glutPostRedisplay();
 }
 
+
 // ===== Mouse =====
 void mouseButton(int button, int stateM, int x, int y) {
-    // Shift + Right-Click -> Popup menu
-    if (button == GLUT_RIGHT_BUTTON && stateM == GLUT_DOWN) {
-        int mods = glutGetModifiers();
-        if (mods & GLUT_ACTIVE_SHIFT) {
-            glutAttachMenu(GLUT_RIGHT_BUTTON);
+    if (showMenu) {
+        if (button == GLUT_LEFT_BUTTON && stateM == GLUT_DOWN) {
+            float mx = static_cast<float>(x);
+            float my = static_cast<float>(WIN_H - y);
+
+            for (int i = 0; i < 3; ++i) {
+                MenuButton& b = menuButtons[i];
+                if (mx >= b.x && mx <= b.x + b.w &&
+                    my >= b.y && my <= b.y + b.h) {
+                    handleMenuSelection(i);
+                    break;
+                }
+            }
         }
-        else {
-            glutDetachMenu(GLUT_RIGHT_BUTTON);
-        }
+        return; // don't let clicks control the game while menu is open
     }
 
     // Arcball only when ESV is main view
@@ -827,16 +1021,14 @@ void resetGame() {
     missionMsg.clear();
     startTime = (int)time(NULL);
     arcballTheta = 0.0f; arcballPhi = 45.0f; arcballRadius = 20.0f;
-    //
-    //////////// BONUS
-    //
+
     for (int i = 0; i < ROBOT_COUNT; ++i) {
         robotDirs[i] = randDir2D();
         robotJumpPhase[i] = frand(0.0f, 100.0f);
         robotYOffset[i] = 0.0f;
     }
     PlayBGMStart();
-    //
+    
     updateArcballCamera();
     glutPostRedisplay();
 }
@@ -852,7 +1044,7 @@ void setupLighting()
     glEnable(GL_COLOR_MATERIAL);
     glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
 
-    // Increase global ambient light to prevent overly dark areas
+
     GLfloat globalAmbient[] = { 0.5f, 0.5f, 0.5f, 1.0f };
     glLightModelfv(GL_LIGHT_MODEL_AMBIENT, globalAmbient);
 
@@ -865,7 +1057,7 @@ void setupLighting()
         GLfloat diffuse[] = { 1.2f, 1.2f, 1.2f, 1.0f };
         GLfloat ambient[] = { 0.4f, 0.4f, 0.4f, 1.0f };
         GLfloat specular[] = { 1.1f, 1.1f, 1.1f, 1.0f };
-        GLfloat direction[] = { -0.4f, -1.0f, -0.3f, 0.0f }; // w=0 for directional
+        GLfloat direction[] = { -0.4f, -1.0f, -0.3f, 0.0f };
 
         glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
         glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
@@ -878,10 +1070,10 @@ void setupLighting()
         glEnable(GL_LIGHT1);
         glDisable(GL_LIGHT0);
 
-        GLfloat diffuse[] = { 1.5f, 1.5f, 1.5f, 1.0f }; // Brighter diffuse
+        GLfloat diffuse[] = { 1.5f, 1.5f, 1.5f, 1.0f };
         GLfloat ambient[] = { 0.3f, 0.3f, 0.3f, 1.0f };
         GLfloat specular[] = { 1.2f, 1.2f, 1.2f, 1.0f };
-        GLfloat position[] = { camFPV.x, camFPV.y + 3.0f, camFPV.z, 1.0f }; // Slightly higher
+        GLfloat position[] = { camFPV.x, camFPV.y + 3.0f, camFPV.z, 1.0f };
 
         glLightfv(GL_LIGHT1, GL_DIFFUSE, diffuse);
         glLightfv(GL_LIGHT1, GL_AMBIENT, ambient);
@@ -890,8 +1082,8 @@ void setupLighting()
 
         // Adjust attenuation for wider reach
         glLightf(GL_LIGHT1, GL_CONSTANT_ATTENUATION, 1.0f);
-        glLightf(GL_LIGHT1, GL_LINEAR_ATTENUATION, 0.005f); // Reduced
-        glLightf(GL_LIGHT1, GL_QUADRATIC_ATTENUATION, 0.001f); // Reduced
+        glLightf(GL_LIGHT1, GL_LINEAR_ATTENUATION, 0.005f);
+        glLightf(GL_LIGHT1, GL_QUADRATIC_ATTENUATION, 0.001f);
     }
 }
 
@@ -910,8 +1102,8 @@ int main(int argc, char** argv) {
     glutInitWindowSize(WIN_W, WIN_H);
     glutCreateWindow("Andrew Trautzsch - 811198871");
 
-    //loadModel("models/utility_box_02_2k.fbx");
-    //generateObstacles(5);
+    loadModel("models/utility_box_02_1k.fbx");
+    generateObstacles(5);
 
 
     // Initialize robots
@@ -919,9 +1111,7 @@ int main(int argc, char** argv) {
     robotAlive.resize(ROBOT_COUNT, true);
     robotRadi.resize(ROBOT_COUNT, 1.0f);
 
-    //
-    //////////// BONUS
-    //
+
     robotDirs.resize(ROBOT_COUNT);
     robotJumpPhase.resize(ROBOT_COUNT, 0.0f);
     robotYOffset.resize(ROBOT_COUNT, 0.0f);
@@ -937,7 +1127,7 @@ int main(int argc, char** argv) {
     glEnable(GL_DEPTH_TEST);
     glClearColor(0, 0, 0, 1);
 
-    // Load textures (make sure these files exist)
+    // Load textures
     torsoTex = loadTexture("textures/torso.png");
     std::cout << "TorsoTex ID = " << torsoTex << "\n";
 
@@ -953,6 +1143,9 @@ int main(int argc, char** argv) {
     groundTex = loadTexture("textures/ground.png");
     std::cout << "GroundTex ID = " << groundTex << "\n";
 
+    skyTex = loadTexture("textures/sky.jpg");
+    std::cout << "SkyTex ID = " << skyTex << "\n";
+
     glutDisplayFunc(MyDisplay);
     glutIdleFunc(MyDisplay);
     glutKeyboardFunc(keyboardInput);
@@ -961,20 +1154,17 @@ int main(int argc, char** argv) {
     glutMouseFunc(mouseButton);
     glutMotionFunc(mouseMotion);
 
-    // Build popup menu (detached by default; Shift+Right attaches temporarily)
     glutCreateMenu(menuHandler);
     glutAddMenuEntry("NEW GAME", 0);
     glutAddMenuEntry("EXIT", 1);
-    glutMenuStatusFunc(onMenuStatus); // re-detach after use (FreeGLUT)
+    glutMenuStatusFunc(onMenuStatus);
 
     updateArcballCamera();
-    printInstructions(); // print to terminal
+    printInstructions();
 
-    //
-    //////////// BONUS
-    //
+
     PlayBGMStart();
-    //
+
 
     glutMainLoop();
     return 0;

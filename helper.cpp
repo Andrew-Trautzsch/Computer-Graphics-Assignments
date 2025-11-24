@@ -10,6 +10,9 @@ const aiScene* importedScene = nullptr;
 Assimp::Importer importer;
 bool showImportedModel = true;
 
+GLuint modelDisplayList = 0;
+bool   modelDisplayListBuilt = false;
+
 struct TextureInfo {
     GLuint id;
     std::string type;
@@ -58,33 +61,39 @@ void drawBitmapString(float x, float y, const std::string& text, void* font) {
 
 // instructions on using program
 void printInstructions() {
-    std::cout << "================= Assignment 3/4: Robot Hunter =================\n";
+    std::cout << "================= Assignment 4: Robot Hunter =================\n";
     std::cout << "Keyboard Controls:\n";
-    std::cout << "  w : Wireframe mode\n";
-    std::cout << "  s : Solid mode\n";
-    std::cout << "  c : Toggle colliders on/off\n";
-    std::cout << "  a : Toggle axes display\n";
-    std::cout << "  b : Toggle bullet speed (slow, fast, very fast)\n";
-    std::cout << "  m : Toggle enemy robot motion (dance / walk)\n";
+    std::cout << "  w   : Wireframe mode (entire scene)\n";
+    std::cout << "  s   : Solid mode (entire scene)\n";
+    std::cout << "  c   : Toggle collider display (robots + obstacles)\n";
+    std::cout << "  a   : Toggle world axes at origin\n";
+    std::cout << "  b   : Toggle bullet speed (slow, fast, very fast)\n";
+    std::cout << "  m   : Toggle robot motion (walk / jump disruption)\n";
+    std::cout << "  l/L : Toggle lighting type (directional / point)\n";
+    std::cout << "  o/O : Toggle imported 3D model and shelf obstacles on/off\n";
     std::cout << "  Space : Fire bullet\n";
-    std::cout << "  F1 : Toggle fullscreen\n";
-    std::cout << "  F2 : Toggle between FPV and ESV views\n";
-    std::cout << "  ESC : Popup menu (NEW GAME / RESUME / EXIT)\n\n";
+    std::cout << "  ESC   : Pause menu (NEW GAME / RESUME / EXIT)\n";
+    std::cout << "  F1    : Toggle fullscreen / windowed\n";
+    std::cout << "  F2    : Swap main FPV / ESV view\n";
+    std::cout << "  F3    : Toggle game sound on/off\n";
+    std::cout << "  F4    : Toggle shading (smooth Gouraud / flat)\n\n";
 
     std::cout << "Camera Controls:\n";
-    std::cout << "  Arrow Keys : Move / rotate FPV camera\n";
-    std::cout << "  Arcball (ESV only):\n";
-    std::cout << "    Left-drag  : Rotate camera\n";
-    std::cout << "    Right-drag : Zoom in/out\n\n";
+    std::cout << "  Arrow Keys (FPV main): move and rotate FPV camera\n";
+    std::cout << "  Arcball (ESV main only):\n";
+    std::cout << "    Left-drag  : rotate camera\n";
+    std::cout << "    Right-drag : zoom in/out\n\n";
 
     std::cout << "Mouse Controls:\n";
-    std::cout << "  Shift + Right-Click : Open popup menu (NEW GAME / RESUME / EXIT)\n\n";
+    std::cout << "  ESC menu: Use arrow keys + Enter/Space or left-click buttons\n\n";
 
     std::cout << "Game Info:\n";
-    std::cout << "  Score +10 for a hit, -2 for a miss\n";
-    std::cout << "  Eliminate all robots within 30 seconds to complete the mission.\n";
+    std::cout << "  Score: +10 for each robot hit, -2 for each missed shot.\n";
+    std::cout << "  Time limit: 30 seconds; eliminate all robots to complete the mission.\n";
+    std::cout << "  All keyboard controls are disabled once the mission ends.\n";
     std::cout << "================================================================\n";
 }
+
 
 
 // Animation
@@ -155,7 +164,7 @@ void createObject(Shape type, Vector3 position, Vector3 rotation, Vector3 scale,
     glPopMatrix(); // end object creation
 }
 
-// NEW: Textured cube used for robot parts
+// Textured cube used for robot parts
 void drawTexturedCube(GLuint tex)
 {
     glEnable(GL_TEXTURE_2D);
@@ -217,7 +226,7 @@ extern std::vector<float>   robotOffsets;
 extern std::vector<int>     robotTypes;
 extern int ROBOT_COUNT;
 
-// initializes robot randomness (position and dance properties)
+// initializes robot randomness
 void initRobots() {
     srand((unsigned int)time(NULL));
     robotPositions.resize(ROBOT_COUNT);
@@ -230,9 +239,25 @@ void initRobots() {
         robotPositions[i] = Vector3((float)((rand() % 40) - 20), 0.0f, (float)((rand() % 40) - 20));
 
         // Randomize dance parameters:
-        robotSpeeds[i] = 0.8f + (float)(rand() % 61) / 100.0f;   // 0.8 .. 1.41
-        robotOffsets[i] = (float)(rand() % 360);                 // phase 0..359
-        robotTypes[i] = rand() % 5;                              // 0..4 animation type
+        robotSpeeds[i] = 0.8f + (float)(rand() % 61) / 100.0f; // 0.8 .. 1.41
+        robotOffsets[i] = (float)(rand() % 360); // phase 0..359
+        robotTypes[i] = rand() % 5; // 0..4 animation type
+    }
+}
+
+void drawMesh(aiMesh* mesh);
+
+void drawNode(aiNode* node)
+{
+    for (unsigned int i = 0; i < node->mNumMeshes; i++)
+    {
+        aiMesh* mesh = importedScene->mMeshes[node->mMeshes[i]];
+        drawMesh(mesh);
+    }
+
+    for (unsigned int i = 0; i < node->mNumChildren; i++)
+    {
+        drawNode(node->mChildren[i]);
     }
 }
 
@@ -274,6 +299,19 @@ void loadModel(const char* path)
             }
         }
     }
+
+    if (modelDisplayList != 0) {
+        glDeleteLists(modelDisplayList, 1);
+        modelDisplayList = 0;
+        modelDisplayListBuilt = false;
+    }
+
+    // Build a new display list for this model
+    modelDisplayList = glGenLists(1);
+    glNewList(modelDisplayList, GL_COMPILE);
+    drawNode(importedScene->mRootNode);
+    glEndList();
+    modelDisplayListBuilt = true;
 }
 
 void drawMesh(aiMesh* mesh)
@@ -338,32 +376,6 @@ void drawMesh(aiMesh* mesh)
 }
 
 
-void drawNode(aiNode* node)
-{
-    for (unsigned int i = 0; i < node->mNumMeshes; i++)
-    {
-        aiMesh* mesh = importedScene->mMeshes[node->mMeshes[i]];
-        drawMesh(mesh);
-    }
-
-    for (unsigned int i = 0; i < node->mNumChildren; i++)
-    {
-        drawNode(node->mChildren[i]);
-    }
-}
-
-void drawModel()
-{
-    if (!showImportedModel || !importedScene)
-        return;
-
-    glPushMatrix();
-    glTranslatef(20, 0, 0);       // Place somewhere visible
-    glScalef(2.0f, 2.0f, 2.0f);   // Adjust scaling as needed
-    drawNode(importedScene->mRootNode);
-    glPopMatrix();
-}
-
 void generateObstacles(int count)
 {
     obstacles.clear();
@@ -383,28 +395,41 @@ void generateObstacles(int count)
 
 void drawObstacles()
 {
-    if (!importedScene) return;
+    if (!showImportedModel || !importedScene) return;
 
     for (auto& o : obstacles)
     {
         if (!o.active) continue;
 
         glPushMatrix();
-        // TEMP debug cube
-        glDisable(GL_TEXTURE_2D);
-        glColor3f(1, 0, 0); // bright red cube
 
-        glPushMatrix();
-        glTranslatef(o.x, o.y + 1.0f, o.z);
-        glutSolidCube(2.0f);   // This must ALWAYS be visible if coordinates are correct
-        glPopMatrix();
-        glTranslatef(o.x, o.y, o.z);
-        glScalef(o.scale * 4.0f, o.scale * 4.0f, o.scale * 4.0f);
+        float s = o.scale * 4.0f;
 
-        drawNode(importedScene->mRootNode);
+        float yOffset = -0.2f * s;
+
+        glTranslatef(o.x, o.y + yOffset, o.z);
+
+        glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
+
+        glScalef(s, s, s);
+
+        // Ensure textures show correctly
+        glColor3f(1.0f, 1.0f, 1.0f);
+
+        // Draw the imported mesh
+        if (modelDisplayListBuilt) {
+            glCallList(modelDisplayList);
+        }
+        else {
+            drawNode(importedScene->mRootNode);
+        }
+
+
         glPopMatrix();
     }
 }
+
+
 
 bool robotBlockedByObstacle(float robotX, float robotZ, float nextX, float nextZ)
 {
@@ -412,7 +437,7 @@ bool robotBlockedByObstacle(float robotX, float robotZ, float nextX, float nextZ
     {
         if (!o.active) continue;
 
-        float size = 2.0f * o.scale;  // shelf footprint
+        float size = 2.0f * o.scale;
 
         float minX = o.x - size;
         float maxX = o.x + size;

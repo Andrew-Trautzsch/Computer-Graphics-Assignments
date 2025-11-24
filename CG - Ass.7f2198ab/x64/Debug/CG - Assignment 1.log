@@ -1,4 +1,6 @@
-﻿  main.cpp
-C:\Users\traut\Computer-Graphics-Assignments\main.cpp(575,57): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-C:\Users\traut\Computer-Graphics-Assignments\main.cpp(575,46): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+﻿  helper.cpp
+  main.cpp
+C:\Users\traut\Computer-Graphics-Assignments\main.cpp(720,57): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\traut\Computer-Graphics-Assignments\main.cpp(720,46): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+  Generating Code...
   CG - Assignment 1.vcxproj -> C:\Users\traut\Computer-Graphics-Assignments\x64\Debug\CG - Assignment 1.exe
