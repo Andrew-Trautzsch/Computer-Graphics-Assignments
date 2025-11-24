@@ -62,6 +62,8 @@ Camera camFPV = { 0.0f, 1.0f, 5.0f, 0.0f, -1.0f, 0.0f };
 Camera camESV = { 0.0f, 20.0f, 0.01f, 0.0f, 0.0f, 0.0f };
 bool mainIsESV = false;
 float cameraMS = 0.1f;
+int lightingMode = 0;
+int shadingMode = 1;  // 0 = flat, 1 = smooth (default)
 
 // ===== Arcball (ESV) =====
 float arcballTheta = 0.0f;
@@ -161,12 +163,24 @@ GLuint armTex = 0;
 GLuint legTex = 0;
 GLuint groundTex = 0;
 
+// ===== Popup Menu State (ESC) =====
+bool showMenu = false;          // true when ESC menu is open
+int  menuSelection = 0;         // 0 = NEW GAME, 1 = RESUME, 2 = EXIT
+
+struct MenuButton {
+    float x, y, w, h;
+};
+
+MenuButton menuButtons[3];   
+
 // ===== Function Prototypes =====
 void updateArcballCamera();
 void toggleFullscreen();
 void resetGame();
 void menuHandler(int option);
 void onMenuStatus(int status, int x, int y);
+void setupLighting();
+
 
 // ===== Utility Draws =====
 void drawAxes() {
@@ -177,21 +191,27 @@ void drawAxes() {
     glEnd();
 }
 
-void drawGroundPlane() {
+void drawGroundPlane()
+{
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, groundTex);
+
     glColor3f(1.0f, 1.0f, 1.0f);
 
     glBegin(GL_QUADS);
-    // Tile the ground for nicer detail
+
+    glNormal3f(0.0f, 1.0f, 0.0f);
+
     glTexCoord2f(0.0f, 0.0f);  glVertex3f(-100.0f, -1.5f, -100.0f);
     glTexCoord2f(8.0f, 0.0f);  glVertex3f(100.0f, -1.5f, -100.0f);
     glTexCoord2f(8.0f, 8.0f);  glVertex3f(100.0f, -1.5f, 100.0f);
     glTexCoord2f(0.0f, 8.0f);  glVertex3f(-100.0f, -1.5f, 100.0f);
+
     glEnd();
 
     glDisable(GL_TEXTURE_2D);
 }
+
 
 // ===== Robots =====
 void drawRobot(float angle, int type, int i);
@@ -256,6 +276,21 @@ void updateBullets() {
             continue;
         }
 
+        // --- OBSTACLE BLOCKING ---
+        for (auto& o : obstacles)
+        {
+            if (!o.active) continue;
+
+            float size = 2.0f * o.scale;
+
+            if (b.pos.x > o.x - size && b.pos.x < o.x + size &&
+                b.pos.z > o.z - size && b.pos.z < o.z + size)
+            {
+                b.active = false;
+                b.hit = true;
+            }
+        }
+
         for (int i = 0; i < ROBOT_COUNT; i++) {
             if (!robotAlive[i]) continue;
 
@@ -311,13 +346,26 @@ void updateRobotMotion() {
             robotYOffset[i] = 0.0f;
 
             float walkSpeed = 0.002f + 0.002f * robotSpeeds[i];
-            robotPositions[i].x += robotDirs[i].x * walkSpeed;
-            robotPositions[i].z += robotDirs[i].z * walkSpeed;
+
+            float nextX = robotPositions[i].x + robotDirs[i].x * walkSpeed;
+            float nextZ = robotPositions[i].z + robotDirs[i].z * walkSpeed;
+
+            // Check shelves as blockers
+            if (robotBlockedByObstacle(robotPositions[i].x, robotPositions[i].z, nextX, nextZ)) {
+                // bounce off: flip direction, but don't move into the shelf
+                robotDirs[i].x = -robotDirs[i].x;
+                robotDirs[i].z = -robotDirs[i].z;
+            }
+            else {
+                robotPositions[i].x = nextX;
+                robotPositions[i].z = nextZ;
+            }
 
             // Occasionally pick a new direction
             if ((rand() % 200) == 0) {
                 robotDirs[i] = randDir2D();
             }
+
 
             // Bounce off bounds
             if (robotPositions[i].x < XZ_MIN || robotPositions[i].x > XZ_MAX) {
@@ -438,7 +486,67 @@ void render3DSceneCommon() {
     drawBullets();
     drawColliders();
     if (axies) drawAxes();
+
+    // Add a test sphere to demonstrate shading
+    glPushMatrix();
+    glTranslatef(5.0f, 1.0f, 5.0f); // Position in scene
+    glScalef(2.0f, 2.0f, 2.0f); // Larger for visibility
+    glColor3f(0.7f, 0.7f, 0.7f); // Neutral color
+    glutSolidSphere(0.5, 20, 20); // Higher resolution for smooth shading
+    glPopMatrix();
 }
+
+void drawFPVGun() {
+    glPushMatrix();
+
+    // Position: lower-right corner, in front of camera
+    glTranslatef(camFPV.x + camFPV.lx * 0.7f,
+        camFPV.y - 0.65f,
+        camFPV.z + camFPV.lz * 0.7f);
+
+    // CORRECT ROTATION (we’ll refine this below as well)
+    float yawDegrees = (-camFPV.angle) * (180.0f / PI) + 90.0f;
+    glRotatef(yawDegrees, 0.0f, 1.0f, 0.0f);
+
+    // Disable texture so lighting + shading is fully visible
+    glDisable(GL_TEXTURE_2D);
+    glColor3f(0.8f, 0.35f, 0.15f);  // Nice brick red
+
+    // Handle
+    glPushMatrix();
+    glTranslatef(0.3f, -0.45f, 0.0f);
+    glScalef(0.2f, 0.75f, 0.2f);
+    glutSolidCube(1.0f);
+    glPopMatrix();
+
+    // Main body
+    glPushMatrix();
+    glTranslatef(0.55f, -0.12f, 0.0f);
+    glScalef(0.8f, 0.4f, 0.4f);
+    glutSolidCube(1.0f);
+    glPopMatrix();
+
+    // Long barrel
+    glPushMatrix();
+    glTranslatef(1.2f, -0.12f, 0.0f);
+    glScalef(1.5f, 0.24f, 0.24f);
+    glutSolidCube(1.0f);
+    glPopMatrix();
+
+    // SMOOTH CYLINDER — this is what makes F4 toggle super obvious
+    glPushMatrix();
+    glTranslatef(1.8f, -0.12f, 0.0f);
+    glRotatef(90.0f, 0.0f, 1.0f, 0.0f);
+    GLUquadric* q = gluNewQuadric();
+    gluQuadricNormals(q, GLU_SMOOTH);
+    gluCylinder(q, 0.12f, 0.12f, 1.0f, 20, 8);
+    gluDeleteQuadric(q);
+    glPopMatrix();
+
+    glEnable(GL_TEXTURE_2D);
+    glPopMatrix();
+}
+
 
 // ===== HUD =====
 void drawHUDViewport() {
@@ -446,6 +554,7 @@ void drawHUDViewport() {
     int hudY = WIN_H - hudH;
     clearViewportArea(0, hudY, WIN_W, hudH);
     glViewport(0, hudY, WIN_W, hudH);
+
     glMatrixMode(GL_PROJECTION); glLoadIdentity();
     gluOrtho2D(0.0, WIN_W, 0.0, hudH);
     glMatrixMode(GL_MODELVIEW); glLoadIdentity();
@@ -484,26 +593,64 @@ void drawMainViewport() {
     clearViewportArea(0, 0, WIN_W, mainH);
     glViewport(0, 0, WIN_W, mainH);
 
+    // ----- Main view -----
+    bool mainIsFPV = !mainIsESV;
+
     if (mainIsESV) {
         updateArcballCamera();
         lookFromCamera(camESV, WIN_W, mainH);
     }
-    else lookFromCamera(camFPV, WIN_W, mainH);
+    else {
+        lookFromCamera(camFPV, WIN_W, mainH);
+    }
+
+    setupLighting();
+    glShadeModel(shadingMode == 0 ? GL_FLAT : GL_SMOOTH);
 
     render3DSceneCommon();
-    drawGunAndAim(mainIsESV);
 
-    // Mini view
+    if (mainIsFPV) {
+        // FPV main: show crosshair + gun
+        drawGunAndAim(false);
+        drawFPVGun();
+    }
+    else {
+        // ESV main: only show player marker
+        drawGunAndAim(true);
+    }
+
+    // ----- Mini view -----
     int miniW = WIN_W / 4, miniH = mainH / 4;
     int miniX = WIN_W - miniW, miniY = mainH - miniH;
     clearViewportArea(miniX, miniY, miniW, miniH);
     glViewport(miniX, miniY, miniW, miniH);
 
-    if (mainIsESV) lookFromCamera(camFPV, miniW, miniH);
-    else lookFromCamera(camESV, miniW, miniH);
+    bool miniIsFPV = !mainIsFPV; // mini view uses the opposite camera
+
+    if (miniIsFPV) {
+        lookFromCamera(camFPV, miniW, miniH);
+    }
+    else {
+        lookFromCamera(camESV, miniW, miniH);
+    }
+
+    setupLighting();
+    glShadeModel(shadingMode == 0 ? GL_FLAT : GL_SMOOTH);
+
     render3DSceneCommon();
-    drawGunAndAim(!mainIsESV);
+
+    if (miniIsFPV) {
+        // FPV mini: show crosshair + gun
+        drawGunAndAim(false);
+        drawFPVGun();
+    }
+    else {
+        // ESV mini: player marker
+        drawGunAndAim(true);
+    }
 }
+
+
 
 // ===== Display =====
 void MyDisplay() {
@@ -525,6 +672,8 @@ void MyDisplay() {
     }
     drawHUDViewport();
     drawMainViewport();
+    drawModel();
+    drawObstacles();
     glutSwapBuffers();
 }
 
@@ -550,6 +699,16 @@ void keyboardInput(unsigned char key, int, int) {
             for (int i = 0; i < ROBOT_COUNT; ++i) robotYOffset[i] = 0.0f;
         }
         break;
+    case 'o':
+    case 'O':
+        showImportedModel = !showImportedModel;
+        break;
+    case 'l':
+    case 'L':
+        lightingMode = (lightingMode == 0 ? 1 : 0);
+        printf("Lighting: %s\n", lightingMode == 0 ? "Directional" : "Point");
+        break;
+
 
     case ' ': {
         Bullet b;
@@ -592,7 +751,9 @@ void specialKeys(int key, int, int) {
         break;
     case GLUT_KEY_F1: toggleFullscreen(); break;
     case GLUT_KEY_F2: mainIsESV = !mainIsESV; break;
+    case GLUT_KEY_F4: shadingMode = (shadingMode == 0 ? 1 : 0);
     }
+
     camFPV.lx = sinf(camFPV.angle);
     camFPV.lz = -cosf(camFPV.angle);
     glutPostRedisplay();
@@ -685,14 +846,73 @@ void menuHandler(int option) {
     else if (option == 1) { StopAllSounds(); exit(0); }
 }
 
+void setupLighting()
+{
+    glEnable(GL_LIGHTING);
+    glEnable(GL_COLOR_MATERIAL);
+    glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+
+    // Increase global ambient light to prevent overly dark areas
+    GLfloat globalAmbient[] = { 0.5f, 0.5f, 0.5f, 1.0f };
+    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, globalAmbient);
+
+    if (lightingMode == 0)
+    {
+        // Directional Light (Sun)
+        glEnable(GL_LIGHT0);
+        glDisable(GL_LIGHT1);
+
+        GLfloat diffuse[] = { 1.2f, 1.2f, 1.2f, 1.0f };
+        GLfloat ambient[] = { 0.4f, 0.4f, 0.4f, 1.0f };
+        GLfloat specular[] = { 1.1f, 1.1f, 1.1f, 1.0f };
+        GLfloat direction[] = { -0.4f, -1.0f, -0.3f, 0.0f }; // w=0 for directional
+
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
+        glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
+        glLightfv(GL_LIGHT0, GL_SPECULAR, specular);
+        glLightfv(GL_LIGHT0, GL_POSITION, direction);
+    }
+    else
+    {
+        // Point Light (Bulb)
+        glEnable(GL_LIGHT1);
+        glDisable(GL_LIGHT0);
+
+        GLfloat diffuse[] = { 1.5f, 1.5f, 1.5f, 1.0f }; // Brighter diffuse
+        GLfloat ambient[] = { 0.3f, 0.3f, 0.3f, 1.0f };
+        GLfloat specular[] = { 1.2f, 1.2f, 1.2f, 1.0f };
+        GLfloat position[] = { camFPV.x, camFPV.y + 3.0f, camFPV.z, 1.0f }; // Slightly higher
+
+        glLightfv(GL_LIGHT1, GL_DIFFUSE, diffuse);
+        glLightfv(GL_LIGHT1, GL_AMBIENT, ambient);
+        glLightfv(GL_LIGHT1, GL_SPECULAR, specular);
+        glLightfv(GL_LIGHT1, GL_POSITION, position);
+
+        // Adjust attenuation for wider reach
+        glLightf(GL_LIGHT1, GL_CONSTANT_ATTENUATION, 1.0f);
+        glLightf(GL_LIGHT1, GL_LINEAR_ATTENUATION, 0.005f); // Reduced
+        glLightf(GL_LIGHT1, GL_QUADRATIC_ATTENUATION, 0.001f); // Reduced
+    }
+}
+
+
+
+
 // ===== Main =====
 int main(int argc, char** argv) {
     srand((unsigned int)time(NULL));
 
     glutInit(&argc, argv);
+    glEnable(GL_TEXTURE_2D);
+    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+    glEnable(GL_NORMALIZE);
     glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE);
     glutInitWindowSize(WIN_W, WIN_H);
     glutCreateWindow("Andrew Trautzsch - 811198871");
+
+    //loadModel("models/utility_box_02_2k.fbx");
+    //generateObstacles(5);
+
 
     // Initialize robots
     initRobots();

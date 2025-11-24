@@ -6,6 +6,20 @@ The printInstructions() and small utilities live here to reduce space in main.cp
 #include "helper.hpp"
 #include <ctime>
 
+const aiScene* importedScene = nullptr;
+Assimp::Importer importer;
+bool showImportedModel = true;
+
+struct TextureInfo {
+    GLuint id;
+    std::string type;
+    std::string path;
+};
+
+std::vector<TextureInfo> modelTextures;
+std::vector<Obstacle> obstacles;
+
+
 // used for color menu
 Vector3 getColor(Color c) {
     switch (c) {
@@ -220,4 +234,197 @@ void initRobots() {
         robotOffsets[i] = (float)(rand() % 360);                 // phase 0..359
         robotTypes[i] = rand() % 5;                              // 0..4 animation type
     }
+}
+
+void loadModel(const char* path)
+{
+    importedScene = importer.ReadFile(path,
+        aiProcess_Triangulate |
+        aiProcess_FlipUVs |
+        aiProcess_GenSmoothNormals |
+        aiProcess_JoinIdenticalVertices);
+
+    if (!importedScene || !importedScene->mRootNode) {
+        std::cout << "[ERROR] Assimp: " << importer.GetErrorString() << "\n";
+        return;
+    }
+
+    std::cout << "[OK] Model loaded.\n";
+
+    // Load all textures in the model
+    modelTextures.clear();
+
+    if (importedScene->mNumMaterials > 0)
+    {
+        for (unsigned int i = 0; i < importedScene->mNumMaterials; i++)
+        {
+            aiMaterial* material = importedScene->mMaterials[i];
+
+            if (material->GetTextureCount(aiTextureType_DIFFUSE) > 0)
+            {
+                aiString str;
+                material->GetTexture(aiTextureType_DIFFUSE, 0, &str);
+
+                std::string texPath = str.C_Str();
+                std::string full = "models/" + texPath;
+
+                GLuint tex = loadTexture(full.c_str());
+
+                modelTextures.push_back({ tex, "diffuse", texPath });
+            }
+        }
+    }
+}
+
+void drawMesh(aiMesh* mesh)
+{
+    aiMaterial* material = importedScene->mMaterials[mesh->mMaterialIndex];
+
+    bool hasTexture = false;
+
+    // Bind diffuse texture if it exists
+    if (material->GetTextureCount(aiTextureType_DIFFUSE) > 0) {
+        aiString str;
+        material->GetTexture(aiTextureType_DIFFUSE, 0, &str);
+
+        for (auto& t : modelTextures) {
+            if (t.path == str.C_Str()) {
+                glEnable(GL_TEXTURE_2D);
+                glBindTexture(GL_TEXTURE_2D, t.id);
+                hasTexture = true;
+                break;
+            }
+        }
+    }
+
+    if (!hasTexture) {
+        glDisable(GL_TEXTURE_2D);
+        glColor3f(0.8f, 0.8f, 0.8f); // simple grey shelf if no texture
+    }
+
+    glBegin(GL_TRIANGLES);
+
+    for (unsigned int i = 0; i < mesh->mNumFaces; i++)
+    {
+        aiFace face = mesh->mFaces[i];
+
+        for (unsigned int j = 0; j < face.mNumIndices; j++)
+        {
+            unsigned int idx = face.mIndices[j];
+
+            // Normal FIRST
+            if (mesh->HasNormals()) {
+                aiVector3D n = mesh->mNormals[idx];
+                glNormal3f(n.x, n.y, n.z);
+            }
+
+            // UV SECOND
+            if (hasTexture && mesh->HasTextureCoords(0)) {
+                aiVector3D uv = mesh->mTextureCoords[0][idx];
+                glTexCoord2f(uv.x, uv.y);
+            }
+
+            // Vertex LAST
+            aiVector3D v = mesh->mVertices[idx];
+            glVertex3f(v.x, v.y, v.z);
+        }
+    }
+
+    glEnd();
+
+    if (hasTexture) {
+        glDisable(GL_TEXTURE_2D);
+    }
+}
+
+
+void drawNode(aiNode* node)
+{
+    for (unsigned int i = 0; i < node->mNumMeshes; i++)
+    {
+        aiMesh* mesh = importedScene->mMeshes[node->mMeshes[i]];
+        drawMesh(mesh);
+    }
+
+    for (unsigned int i = 0; i < node->mNumChildren; i++)
+    {
+        drawNode(node->mChildren[i]);
+    }
+}
+
+void drawModel()
+{
+    if (!showImportedModel || !importedScene)
+        return;
+
+    glPushMatrix();
+    glTranslatef(20, 0, 0);       // Place somewhere visible
+    glScalef(2.0f, 2.0f, 2.0f);   // Adjust scaling as needed
+    drawNode(importedScene->mRootNode);
+    glPopMatrix();
+}
+
+void generateObstacles(int count)
+{
+    obstacles.clear();
+
+    for (int i = 0; i < count; i++)
+    {
+        float x = static_cast<float>((rand() % 80) - 40);
+        float z = static_cast<float>((rand() % 80) - 40);
+        float scale = static_cast<float>(rand() % 10) / 10.0f + 1.0f;
+
+        obstacles.emplace_back(x, 0.0f, z, scale);
+    }
+
+    std::cout << "[OK] Generated " << count << " obstacles\n";
+}
+
+
+void drawObstacles()
+{
+    if (!importedScene) return;
+
+    for (auto& o : obstacles)
+    {
+        if (!o.active) continue;
+
+        glPushMatrix();
+        // TEMP debug cube
+        glDisable(GL_TEXTURE_2D);
+        glColor3f(1, 0, 0); // bright red cube
+
+        glPushMatrix();
+        glTranslatef(o.x, o.y + 1.0f, o.z);
+        glutSolidCube(2.0f);   // This must ALWAYS be visible if coordinates are correct
+        glPopMatrix();
+        glTranslatef(o.x, o.y, o.z);
+        glScalef(o.scale * 4.0f, o.scale * 4.0f, o.scale * 4.0f);
+
+        drawNode(importedScene->mRootNode);
+        glPopMatrix();
+    }
+}
+
+bool robotBlockedByObstacle(float robotX, float robotZ, float nextX, float nextZ)
+{
+    for (auto& o : obstacles)
+    {
+        if (!o.active) continue;
+
+        float size = 2.0f * o.scale;  // shelf footprint
+
+        float minX = o.x - size;
+        float maxX = o.x + size;
+        float minZ = o.z - size;
+        float maxZ = o.z + size;
+
+        // If next robot position would be inside shelf footprint  blocked
+        if (nextX > minX && nextX < maxX &&
+            nextZ > minZ && nextZ < maxZ)
+        {
+            return true;
+        }
+    }
+    return false;
 }

@@ -14,6 +14,14 @@ This file consists of global variables, helpful datastructures, and helper funct
 #include <cmath>
 #include <ctime>
 #include <stb_image.h>
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+
+extern bool showImportedModel;
+void loadModel(const char* path);
+void drawModel();
+GLuint loadTexture(const char* filename);
 
 struct Vector3
 {
@@ -47,10 +55,28 @@ struct Camera {
 struct Bullet {
     Vector3 pos;
     Vector3 dir;
-    float speed;
-    bool active;
-    bool hit;
+    float speed = 0.0f;
+    bool active = false;
+    bool hit = false;
 };
+
+
+struct Obstacle {
+    float x, y, z;
+    float scale;
+    bool active;
+
+    Obstacle(float X = 0, float Y = 0, float Z = 0, float S = 1.0f)
+        : x(X), y(Y), z(Z), scale(S), active(true) {
+    }
+};
+
+extern std::vector<Obstacle> obstacles;
+
+void generateObstacles(int count);
+void drawObstacles();
+bool robotBlockedByObstacle(float robotX, float robotZ, float nextX, float nextZ);
+
 
 // Externs provided/owned by main.cpp
 extern int WIN_W;

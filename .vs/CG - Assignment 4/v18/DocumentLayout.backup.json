@@ -30,9 +30,9 @@
               "Title": "main.cpp",
               "DocumentMoniker": "C:\\Users\\traut\\Computer-Graphics-Assignments\\main.cpp",
               "RelativeDocumentMoniker": "main.cpp",
-              "ToolTip": "C:\\Users\\traut\\Computer-Graphics-Assignments\\main.cpp*",
-              "RelativeToolTip": "main.cpp*",
-              "ViewState": "AgIAAMICAAAAAAAAAAAAAN0CAAA4AAAAAAAAAA==",
+              "ToolTip": "C:\\Users\\traut\\Computer-Graphics-Assignments\\main.cpp",
+              "RelativeToolTip": "main.cpp",
+              "ViewState": "AgIAAMUBAAAAAAAAAAAAAMsBAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
               "WhenOpened": "2025-11-23T03:54:39.304Z",
               "IsPinned": true,
@@ -46,9 +46,10 @@
               "RelativeDocumentMoniker": "helper.hpp",
               "ToolTip": "C:\\Users\\traut\\Computer-Graphics-Assignments\\helper.hpp",
               "RelativeToolTip": "helper.hpp",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAAQAAAAAAAAAA==",
+              "ViewState": "AgIAABsAAAAAAAAAAAAAAC4AAAACAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
-              "WhenOpened": "2025-11-23T05:14:38.157Z"
+              "WhenOpened": "2025-11-23T05:14:38.157Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -58,9 +59,10 @@
               "RelativeDocumentMoniker": "helper.cpp",
               "ToolTip": "C:\\Users\\traut\\Computer-Graphics-Assignments\\helper.cpp",
               "RelativeToolTip": "helper.cpp",
-              "ViewState": "AgIAAKsAAAAAAAAAAAAAwMAAAAAeAAAAAAAAAA==",
+              "ViewState": "AgIAAN0AAAAAAAAAAAAowOwAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
-              "WhenOpened": "2025-11-23T05:14:36.298Z"
+              "WhenOpened": "2025-11-23T05:14:36.298Z",
+              "EditorCaption": ""
             }
           ]
         }
